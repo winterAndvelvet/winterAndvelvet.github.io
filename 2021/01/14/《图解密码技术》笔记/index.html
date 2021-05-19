@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="密码技术," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="背景 Why为什么需要加密 窃听 篡改&#x2F;劫持（中间人攻击） 伪装 重放 抵赖 小结   How如何使我们的数据更安全 保证机密性 对称加密 非对称加密   保证完整性 单向散列函数   保证真实性&amp;完整性 消息认证码   保证完整性&amp;真实性&amp;不可否认 数字签名   总结   综合应用实例：TLS TLS&#x2F;SSL">
+<meta property="og:type" content="article">
+<meta property="og:title" content="《图解密码技术》笔记">
+<meta property="og:url" content="http://example.com/2021/01/14/%E3%80%8A%E5%9B%BE%E8%A7%A3%E5%AF%86%E7%A0%81%E6%8A%80%E6%9C%AF%E3%80%8B%E7%AC%94%E8%AE%B0/index.html">
+<meta property="og:site_name" content="Hello World">
+<meta property="og:description" content="背景 Why为什么需要加密 窃听 篡改&#x2F;劫持（中间人攻击） 伪装 重放 抵赖 小结   How如何使我们的数据更安全 保证机密性 对称加密 非对称加密   保证完整性 单向散列函数   保证真实性&amp;完整性 消息认证码   保证完整性&amp;真实性&amp;不可否认 数字签名   总结   综合应用实例：TLS TLS&#x2F;SSL">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://s3.ax1x.com/2021/01/13/sNUay8.png">
+<meta property="og:image" content="https://s3.ax1x.com/2021/01/13/sNUdOS.png">
+<meta property="og:image" content="https://s3.ax1x.com/2021/01/13/sNU0eg.png">
+<meta property="og:image" content="https://s3.ax1x.com/2021/01/13/sNUBwQ.md.png">
+<meta property="og:image" content="https://s3.ax1x.com/2021/01/13/sNUDoj.png">
+<meta property="og:image" content="https://s3.ax1x.com/2021/01/13/sNUsFs.png">
+<meta property="article:published_time" content="2021-01-14T11:32:39.000Z">
+<meta property="article:modified_time" content="2021-05-19T12:36:32.747Z">
+<meta property="article:author" content="winter">
+<meta property="article:tag" content="密码技术">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s3.ax1x.com/2021/01/13/sNUay8.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '',
+    scheme: 'Gemini',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://example.com/2021/01/14/《图解密码技术》笔记/"/>
+
+
+
+
+
+  <title>《图解密码技术》笔记 | Hello World</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Hello World</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">醉后不知天在水，满船清梦压星河</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            Categories
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-search">
+          <a href="/search/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-search"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/01/14/%E3%80%8A%E5%9B%BE%E8%A7%A3%E5%AF%86%E7%A0%81%E6%8A%80%E6%9C%AF%E3%80%8B%E7%AC%94%E8%AE%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="https://z3.ax1x.com/2021/05/19/g4JX1f.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Hello World">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">《图解密码技术》笔记</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2021-01-14T19:32:39+08:00">
+                2021-01-14
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/code/" itemprop="url" rel="index">
+                    <span itemprop="name">code</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <!-- TOC -->
+
+<ul>
+<li><a href="#%E8%83%8C%E6%99%AF">背景</a></li>
+<li><a href="#why%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%8A%A0%E5%AF%86">Why为什么需要加密</a><ul>
+<li><a href="#%E7%AA%83%E5%90%AC">窃听</a></li>
+<li><a href="#%E7%AF%A1%E6%94%B9%E5%8A%AB%E6%8C%81%E4%B8%AD%E9%97%B4%E4%BA%BA%E6%94%BB%E5%87%BB">篡改/劫持（中间人攻击）</a></li>
+<li><a href="#%E4%BC%AA%E8%A3%85">伪装</a></li>
+<li><a href="#%E9%87%8D%E6%94%BE">重放</a></li>
+<li><a href="#%E6%8A%B5%E8%B5%96">抵赖</a></li>
+<li><a href="#%E5%B0%8F%E7%BB%93">小结</a></li>
+</ul>
+</li>
+<li><a href="#how%E5%A6%82%E4%BD%95%E4%BD%BF%E6%88%91%E4%BB%AC%E7%9A%84%E6%95%B0%E6%8D%AE%E6%9B%B4%E5%AE%89%E5%85%A8">How如何使我们的数据更安全</a><ul>
+<li><a href="#%E4%BF%9D%E8%AF%81%E6%9C%BA%E5%AF%86%E6%80%A7">保证机密性</a><ul>
+<li><a href="#%E5%AF%B9%E7%A7%B0%E5%8A%A0%E5%AF%86">对称加密</a></li>
+<li><a href="#%E9%9D%9E%E5%AF%B9%E7%A7%B0%E5%8A%A0%E5%AF%86">非对称加密</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BF%9D%E8%AF%81%E5%AE%8C%E6%95%B4%E6%80%A7">保证完整性</a><ul>
+<li><a href="#%E5%8D%95%E5%90%91%E6%95%A3%E5%88%97%E5%87%BD%E6%95%B0">单向散列函数</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BF%9D%E8%AF%81%E7%9C%9F%E5%AE%9E%E6%80%A7%E5%AE%8C%E6%95%B4%E6%80%A7">保证真实性&amp;完整性</a><ul>
+<li><a href="#%E6%B6%88%E6%81%AF%E8%AE%A4%E8%AF%81%E7%A0%81">消息认证码</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BF%9D%E8%AF%81%E5%AE%8C%E6%95%B4%E6%80%A7%E7%9C%9F%E5%AE%9E%E6%80%A7%E4%B8%8D%E5%8F%AF%E5%90%A6%E8%AE%A4">保证完整性&amp;真实性&amp;不可否认</a><ul>
+<li><a href="#%E6%95%B0%E5%AD%97%E7%AD%BE%E5%90%8D">数字签名</a></li>
+</ul>
+</li>
+<li><a href="#%E6%80%BB%E7%BB%93">总结</a></li>
+</ul>
+</li>
+<li><a href="#%E7%BB%BC%E5%90%88%E5%BA%94%E7%94%A8%E5%AE%9E%E4%BE%8Btls">综合应用实例：TLS</a><ul>
+<li><a href="#tlsssl">TLS/SSL</a></li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+<span id="more"></span>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>项目中有一个模块是Api Gateway,api网关在微服务架构中负责整个项目对外的接口，它封装了系统内部的架构，为客户提供定制的rest api调用访问。通常它包含身份认证、负载均衡、路由管理等功能。其中身份认证那部分team用的是hmac,发现自己对一些基本的加密技术并不是很了解，甚至没有一个基本的分类和认知，在网上看到有推荐《图解密码技术》，写的比较容易懂，一周每晚看一点就看完了。故梳理一下基本概念和使用场景，不做深入研究。（精力和智商有限）</p>
+<hr>
+<h2 id="Why为什么需要加密"><a href="#Why为什么需要加密" class="headerlink" title="Why为什么需要加密"></a>Why为什么需要加密</h2><p>古人云，知其然、知其所以然。学习技术也是，不光要知道它的原理，更要知道这个技术是为了解决什么问题而诞生的。复杂的业务场景推动了技术的进步，而不是技术的进步使复杂的事情变得简单。所以，要学会问–这个技术是为了解决什么问题？<br>谈到为什么需要加密，不得不总结一下数据在网络传输中遇到了一些挑战（以http访问为例）。</p>
+<h3 id="窃听"><a href="#窃听" class="headerlink" title="窃听"></a>窃听</h3><p>HTTP 本身不具备加密功能，所以传输过程中都是以明文方式发送。由于在网络的传输过程中，我们所发送的信息要经过许多的网络节点和设备，在这个过程中这些设备是可能会拦截我们的信息并且进行窃听的，直接通过一些常用的抓包工具就可以窃听未加密的网络传输信息。如果信息中存在敏感信息，如密码之类的，就会直接拿到</p>
+<h3 id="篡改-劫持（中间人攻击）"><a href="#篡改-劫持（中间人攻击）" class="headerlink" title="篡改/劫持（中间人攻击）"></a>篡改/劫持（中间人攻击）</h3><p>如果流量一旦被劫持，就可能被修改，http通常也无法确认消息的准确性。其中有一种攻击方式是中间人攻击：具体来说就是攻击者介入发送者和接收者的中间，对发送者伪装成接收者，对接收者伪装者成发送者，从而能在无需破解数字签名的前提下完成攻击。</p>
+<h3 id="伪装"><a href="#伪装" class="headerlink" title="伪装"></a>伪装</h3><p>例如攻击者伪装成真正的发送者，执行一些操作。</p>
+<h3 id="重放"><a href="#重放" class="headerlink" title="重放"></a>重放</h3><p>是指攻击者发送一个目的主机已接收过的包，来达到欺骗系统的目的，主要用于身份认证过程，破坏认证的正确性。攻击者不用解密请求的内容，但如果知道这个请求的含义（url中api的名字通常会暴漏请求的含义），就可以做到攻击（加时间戳可以fix）。看到一个通俗易懂的例子：</p>
+<ul>
+<li>A向服务器发送了一条请求（附带了签名并进行了加密），是像B打一笔钱。</li>
+<li>服务器接收到请求并执行了相应的操作。</li>
+<li>但是B拿到了这个流量，并重复的发给服务器。进行欺骗。<h3 id="抵赖"><a href="#抵赖" class="headerlink" title="抵赖"></a>抵赖</h3>发送方不真实的否认已经发送的消息。<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3>其实攻击者往往为了达到目的，不仅仅使用某一种方法，通常是组合拳，而且这些方法并不是完全独立了，也有相应的耦合。总的来说这些攻击都是在破坏信息的几个方面。</li>
+</ul>
+<p><img src="https://s3.ax1x.com/2021/01/13/sNUay8.png"></p>
+<h2 id="How如何使我们的数据更安全"><a href="#How如何使我们的数据更安全" class="headerlink" title="How如何使我们的数据更安全"></a>How如何使我们的数据更安全</h2><h3 id="保证机密性"><a href="#保证机密性" class="headerlink" title="保证机密性"></a>保证机密性</h3><p>发送方对消息进行加密，接收方解密，中途即使被窃听，由于缺少密钥，拿到的是乱码，不知道消息的内容。</p>
+<h4 id="对称加密"><a href="#对称加密" class="headerlink" title="对称加密"></a>对称加密</h4><p>在对称加密中，只用同一个密钥来加密和解密信息。至于为什么可以用同一串数字加密和解密，加密算法基础是XOR（异或），加强版本有DES(已能被破解)、三重DES、AES、Rijndael等。现在用的大都是AES。</p>
+<p><img src="https://s3.ax1x.com/2021/01/13/sNUdOS.png"></p>
+<p><strong>- 优：快</strong><br><strong>- 不足：密钥配送问题，对方如果要能解密你的信息，就必须把密钥发送给对方，中途一旦被其他人截胡，就可以直接解密之后你们的通信内容了。</strong></p>
+<h4 id="非对称加密"><a href="#非对称加密" class="headerlink" title="非对称加密"></a>非对称加密</h4><p>考虑到对称加密的劣势，思考有没有一种方法是黑客即使在通信的过程中获取了你们传递的密钥也无法破译消息？非对称加密就解决了这个问题，现在广泛使用的是RSA算法。<br>（1）发送者只需要加密密钥。<br>（2）接收者只需要解密密钥。<br>（3）解密密钥不参与传输，所以不能被窃听者拿到。<br>（4）加密密钥被窃听者拿到也无所谓。</p>
+<p><img src="https://s3.ax1x.com/2021/01/13/sNU0eg.png"></p>
+<p><strong>- 优：不用担心密钥配送问题，更好的保证了消息的机密性。</strong><br><strong>- 不足：加解密算法复杂，速度慢。解决了密钥配送问题，但无法防御中间人攻击，此外还需要确认B发来的公钥是否真的属于B（这就需要公钥证书）。</strong></p>
+<h3 id="保证完整性"><a href="#保证完整性" class="headerlink" title="保证完整性"></a>保证完整性</h3><p>除了保证消息的机密性外，我们还要确保消息中途没有被修改过。</p>
+<h4 id="单向散列函数"><a href="#单向散列函数" class="headerlink" title="单向散列函数"></a>单向散列函数</h4><p>就是我们工作中常用来比较两个文件是否相同的sha1,sha256,md5等。</p>
+<h3 id="保证真实性-amp-完整性"><a href="#保证真实性-amp-完整性" class="headerlink" title="保证真实性&amp;完整性"></a>保证真实性&amp;完整性</h3><h4 id="消息认证码"><a href="#消息认证码" class="headerlink" title="消息认证码"></a>消息认证码</h4><p>消息认证码（MAC）：将发送者和接收者之间的“共享密钥”和“消息”进行混合后计算出散列值。HMAC运算利用hash算法，以一个消息M和一个密钥K作为输入，生成一个定长的消息摘要作为输出。</p>
+<p><img src="https://s3.ax1x.com/2021/01/13/sNUBwQ.md.png"></p>
+<p>（1）A和B事先共享密钥<br>（2）A使用密钥+消息计算MAC值<br>（3）A将消息和MAC两者同时发送给接收者B<br>（4）B也用共享密钥根据接收到的消息计算出一个MAC值<br>（5）B对比自己计算的MAC和接收的MAC值是否一致，若一致，则可以判断出消息是来自A，并且没有被篡改过。<br>在消息认证码中，A和B要使用同一个密钥，这个密钥是不能被攻击者拿到的，否则认证就没有作用了。这种存在密钥配送问题的解决方法，可以使用非对称密码（将共享密钥加密）、密钥分配中心等。<br><strong>- 优：可以识别消息是否被篡改和发送者是否被伪装，同时保证了完整性和真实性。</strong><br><strong>- 不足：由于A和B拥有同样的密钥，可以计算相同的MAC,在出具借条的场景中无法使用，因为无法防止否认。</strong></p>
+<h3 id="保证完整性-amp-真实性-amp-不可否认"><a href="#保证完整性-amp-真实性-amp-不可否认" class="headerlink" title="保证完整性&amp;真实性&amp;不可否认"></a>保证完整性&amp;真实性&amp;不可否认</h3><h4 id="数字签名"><a href="#数字签名" class="headerlink" title="数字签名"></a>数字签名</h4><p>既然要具有不可否认性，就不能使用同样的密钥加密。思路是，用自己的私钥生成签名，验证者通过公钥验证但无法用此公钥生成同样的签名（私钥签名，公钥验证），这就是像非对称密码中对消息加密解密的相反过程（公钥加密，私钥解密）。此外，不管是数字签名还是非对称密钥，不可泄漏的密钥不能参与传输，只有一方持有。<br>（1）我们这次不使用消息直接进行签名，是因为消息不论多么长，散列值试固定了，所以对散列值进行签名更加简单。<br>（2）最后对比的是散列值：通过公钥解密签名后的消息的散列值和通过直接对消息计算得出的散列值。<br><strong>-优：保证了完整性、真实性和不可否认性。</strong><br><strong>-不足：我们看到消息没有加密就发送了，无法保证机密性。因为数字签名确实不是保证机密性的。我们可以同时使用加密和签名组合的方法解决这个问题。在综合应用的时候会讲。</strong></p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p><img src="https://s3.ax1x.com/2021/01/13/sNUDoj.png"></p>
+<hr>
+<h2 id="综合应用实例：TLS"><a href="#综合应用实例：TLS" class="headerlink" title="综合应用实例：TLS"></a>综合应用实例：TLS</h2><h3 id="TLS-SSL"><a href="#TLS-SSL" class="headerlink" title="TLS/SSL"></a>TLS/SSL</h3><p>SSL/TLS是世界上应用最广泛的密码通信方法，它综合应用了对称密码、非对称密、数字签名、伪随机数生成器。具有消息加密，身份认证，防篡改等。<br><em>基本过程：</em><br><img src="https://s3.ax1x.com/2021/01/13/sNUsFs.png"></p>
+<ul>
+<li><p>客户端通过服务端证书得到了服务器的合法公钥，完成服务器认证。</p>
+</li>
+<li><p>服务器通过客户端证书得到了客户端的合法公钥，完成客户端认证。（当需要客户端认证的时候）</p>
+</li>
+<li><p>客户端和服务器生成了密码通信中使用的共享密钥。</p>
+</li>
+<li><p>客户端和服务器生成了消息认证码中使用的共享密钥。是整个握手阶段出现的第三个随机数。</p>
+</li>
+<li><p>客户端随机数、服务端随机数、预备主密码。根据预备主密码客户端和服务器- 通过约定好的单向散列函数生成同样的主密码。该主密码怎么参与后面的通信呢？作用如下：<br>  （1）作为对称密码的密钥进行消息的加密/解密。（客户端&lt;–&gt;服务器）<br>  （2）作为消息认证码的密钥，确认客户端和服务器的真实性和一致性。（客户端&lt;–&gt;服务器）</p>
+<table>
+<thead>
+<tr>
+<th align="left">密码技术</th>
+<th align="right">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">非对称加密（公钥密码）</td>
+<td align="right">加密预备主密码</td>
+</tr>
+<tr>
+<td align="left">单向散列函数</td>
+<td align="right">伪随机数生成器</td>
+</tr>
+<tr>
+<td align="left">数字签名</td>
+<td align="right">验证服务器和客户端证书</td>
+</tr>
+<tr>
+<td align="left">伪随机数生成器</td>
+<td align="right">生成预备主密码</td>
+</tr>
+<tr>
+<td align="left">单元格</td>
+<td align="right">单元格</td>
+</tr>
+</tbody></table>
+</li>
+</ul>
+<p><em><strong>关于证书的验证：<br>在使用非对称加密的时候，我们需要确认对方给我们的公钥确实是属于他的，这就需要一个第三方的认证机构。流程是这样的:</strong></em><br><strong>服务端生成密钥对，并在认证机构注册自己的公钥，认证机构用自己的私钥对服务端的公钥施加数字签名并生成证书，证书中包含了服务器的公钥和第三方机构的签名。客户端拿到证书，用机构的公钥验证签名，解密后的公钥和证书中的服务器公钥进行对比，确认服务端的公钥的合法性。就是相当于信任第三方机构的公钥，来验证客户的公钥的合法性。</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/%E5%AF%86%E7%A0%81%E6%8A%80%E6%9C%AF/" rel="tag"># 密码技术</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/01/14/Error-Handling-in-Nodejs/" rel="next" title="Error Handling in Nodejs">
+                <i class="fa fa-chevron-left"></i> Error Handling in Nodejs
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/01/18/%E9%95%BF%E6%BB%A9%E6%97%A5%E5%87%BA/" rel="prev" title="长滩日出">
+                长滩日出 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image"
+                src="https://z3.ax1x.com/2021/05/19/g4JX1f.jpg"
+                alt="" />
+            
+              <p class="site-author-name" itemprop="name"></p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/%7C%7C%20archive">
+              
+                  <span class="site-state-item-count">6</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">categories</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">11</span>
+                  <span class="site-state-item-name">tags</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+            <div class="links-of-author motion-element">
+                
+                  <span class="links-of-author-item">
+                    <a href="https://github.com/winterAndvelvet" target="_blank" title="GitHub">
+                      
+                        <i class="fa fa-fw fa-github"></i>GitHub</a>
+                  </span>
+                
+                  <span class="links-of-author-item">
+                    <a href="https://www.weibo.com/win9ter" target="_blank" title="Weibo">
+                      
+                        <i class="fa fa-fw fa-weibo"></i>Weibo</a>
+                  </span>
+                
+            </div>
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Why%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%8A%A0%E5%AF%86"><span class="nav-number">2.</span> <span class="nav-text">Why为什么需要加密</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AA%83%E5%90%AC"><span class="nav-number">2.1.</span> <span class="nav-text">窃听</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AF%A1%E6%94%B9-%E5%8A%AB%E6%8C%81%EF%BC%88%E4%B8%AD%E9%97%B4%E4%BA%BA%E6%94%BB%E5%87%BB%EF%BC%89"><span class="nav-number">2.2.</span> <span class="nav-text">篡改&#x2F;劫持（中间人攻击）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BC%AA%E8%A3%85"><span class="nav-number">2.3.</span> <span class="nav-text">伪装</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%87%8D%E6%94%BE"><span class="nav-number">2.4.</span> <span class="nav-text">重放</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8A%B5%E8%B5%96"><span class="nav-number">2.5.</span> <span class="nav-text">抵赖</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">2.6.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#How%E5%A6%82%E4%BD%95%E4%BD%BF%E6%88%91%E4%BB%AC%E7%9A%84%E6%95%B0%E6%8D%AE%E6%9B%B4%E5%AE%89%E5%85%A8"><span class="nav-number">3.</span> <span class="nav-text">How如何使我们的数据更安全</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%9D%E8%AF%81%E6%9C%BA%E5%AF%86%E6%80%A7"><span class="nav-number">3.1.</span> <span class="nav-text">保证机密性</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AF%B9%E7%A7%B0%E5%8A%A0%E5%AF%86"><span class="nav-number">3.1.1.</span> <span class="nav-text">对称加密</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%9D%9E%E5%AF%B9%E7%A7%B0%E5%8A%A0%E5%AF%86"><span class="nav-number">3.1.2.</span> <span class="nav-text">非对称加密</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%9D%E8%AF%81%E5%AE%8C%E6%95%B4%E6%80%A7"><span class="nav-number">3.2.</span> <span class="nav-text">保证完整性</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8D%95%E5%90%91%E6%95%A3%E5%88%97%E5%87%BD%E6%95%B0"><span class="nav-number">3.2.1.</span> <span class="nav-text">单向散列函数</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%9D%E8%AF%81%E7%9C%9F%E5%AE%9E%E6%80%A7-amp-%E5%AE%8C%E6%95%B4%E6%80%A7"><span class="nav-number">3.3.</span> <span class="nav-text">保证真实性&amp;完整性</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E8%AE%A4%E8%AF%81%E7%A0%81"><span class="nav-number">3.3.1.</span> <span class="nav-text">消息认证码</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%9D%E8%AF%81%E5%AE%8C%E6%95%B4%E6%80%A7-amp-%E7%9C%9F%E5%AE%9E%E6%80%A7-amp-%E4%B8%8D%E5%8F%AF%E5%90%A6%E8%AE%A4"><span class="nav-number">3.4.</span> <span class="nav-text">保证完整性&amp;真实性&amp;不可否认</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E5%AD%97%E7%AD%BE%E5%90%8D"><span class="nav-number">3.4.1.</span> <span class="nav-text">数字签名</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.5.</span> <span class="nav-text">总结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%BC%E5%90%88%E5%BA%94%E7%94%A8%E5%AE%9E%E4%BE%8B%EF%BC%9ATLS"><span class="nav-number">4.</span> <span class="nav-text">综合应用实例：TLS</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#TLS-SSL"><span class="nav-number">4.1.</span> <span class="nav-text">TLS&#x2F;SSL</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">winter</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Gemini</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/canvas-nest/canvas-nest.min.js"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
