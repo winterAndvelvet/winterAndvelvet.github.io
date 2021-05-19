@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>《图解密码技术》笔记</title>
+    <url>/2021/01/14/%E3%80%8A%E5%9B%BE%E8%A7%A3%E5%AF%86%E7%A0%81%E6%8A%80%E6%9C%AF%E3%80%8B%E7%AC%94%E8%AE%B0/</url>
+    <content><![CDATA[<!-- TOC -->
+
+<ul>
+<li><a href="#%E8%83%8C%E6%99%AF">背景</a></li>
+<li><a href="#why%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E5%8A%A0%E5%AF%86">Why为什么需要加密</a><ul>
+<li><a href="#%E7%AA%83%E5%90%AC">窃听</a></li>
+<li><a href="#%E7%AF%A1%E6%94%B9%E5%8A%AB%E6%8C%81%E4%B8%AD%E9%97%B4%E4%BA%BA%E6%94%BB%E5%87%BB">篡改/劫持（中间人攻击）</a></li>
+<li><a href="#%E4%BC%AA%E8%A3%85">伪装</a></li>
+<li><a href="#%E9%87%8D%E6%94%BE">重放</a></li>
+<li><a href="#%E6%8A%B5%E8%B5%96">抵赖</a></li>
+<li><a href="#%E5%B0%8F%E7%BB%93">小结</a></li>
+</ul>
+</li>
+<li><a href="#how%E5%A6%82%E4%BD%95%E4%BD%BF%E6%88%91%E4%BB%AC%E7%9A%84%E6%95%B0%E6%8D%AE%E6%9B%B4%E5%AE%89%E5%85%A8">How如何使我们的数据更安全</a><ul>
+<li><a href="#%E4%BF%9D%E8%AF%81%E6%9C%BA%E5%AF%86%E6%80%A7">保证机密性</a><ul>
+<li><a href="#%E5%AF%B9%E7%A7%B0%E5%8A%A0%E5%AF%86">对称加密</a></li>
+<li><a href="#%E9%9D%9E%E5%AF%B9%E7%A7%B0%E5%8A%A0%E5%AF%86">非对称加密</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BF%9D%E8%AF%81%E5%AE%8C%E6%95%B4%E6%80%A7">保证完整性</a><ul>
+<li><a href="#%E5%8D%95%E5%90%91%E6%95%A3%E5%88%97%E5%87%BD%E6%95%B0">单向散列函数</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BF%9D%E8%AF%81%E7%9C%9F%E5%AE%9E%E6%80%A7%E5%AE%8C%E6%95%B4%E6%80%A7">保证真实性&amp;完整性</a><ul>
+<li><a href="#%E6%B6%88%E6%81%AF%E8%AE%A4%E8%AF%81%E7%A0%81">消息认证码</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BF%9D%E8%AF%81%E5%AE%8C%E6%95%B4%E6%80%A7%E7%9C%9F%E5%AE%9E%E6%80%A7%E4%B8%8D%E5%8F%AF%E5%90%A6%E8%AE%A4">保证完整性&amp;真实性&amp;不可否认</a><ul>
+<li><a href="#%E6%95%B0%E5%AD%97%E7%AD%BE%E5%90%8D">数字签名</a></li>
+</ul>
+</li>
+<li><a href="#%E6%80%BB%E7%BB%93">总结</a></li>
+</ul>
+</li>
+<li><a href="#%E7%BB%BC%E5%90%88%E5%BA%94%E7%94%A8%E5%AE%9E%E4%BE%8Btls">综合应用实例：TLS</a><ul>
+<li><a href="#tlsssl">TLS/SSL</a></li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+<span id="more"></span>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>项目中有一个模块是Api Gateway,api网关在微服务架构中负责整个项目对外的接口，它封装了系统内部的架构，为客户提供定制的rest api调用访问。通常它包含身份认证、负载均衡、路由管理等功能。其中身份认证那部分team用的是hmac,发现自己对一些基本的加密技术并不是很了解，甚至没有一个基本的分类和认知，在网上看到有推荐《图解密码技术》，写的比较容易懂，一周每晚看一点就看完了。故梳理一下基本概念和使用场景，不做深入研究。（精力和智商有限）</p>
+<hr>
+<h2 id="Why为什么需要加密"><a href="#Why为什么需要加密" class="headerlink" title="Why为什么需要加密"></a>Why为什么需要加密</h2><p>古人云，知其然、知其所以然。学习技术也是，不光要知道它的原理，更要知道这个技术是为了解决什么问题而诞生的。复杂的业务场景推动了技术的进步，而不是技术的进步使复杂的事情变得简单。所以，要学会问–这个技术是为了解决什么问题？<br>谈到为什么需要加密，不得不总结一下数据在网络传输中遇到了一些挑战（以http访问为例）。</p>
+<h3 id="窃听"><a href="#窃听" class="headerlink" title="窃听"></a>窃听</h3><p>HTTP 本身不具备加密功能，所以传输过程中都是以明文方式发送。由于在网络的传输过程中，我们所发送的信息要经过许多的网络节点和设备，在这个过程中这些设备是可能会拦截我们的信息并且进行窃听的，直接通过一些常用的抓包工具就可以窃听未加密的网络传输信息。如果信息中存在敏感信息，如密码之类的，就会直接拿到</p>
+<h3 id="篡改-劫持（中间人攻击）"><a href="#篡改-劫持（中间人攻击）" class="headerlink" title="篡改/劫持（中间人攻击）"></a>篡改/劫持（中间人攻击）</h3><p>如果流量一旦被劫持，就可能被修改，http通常也无法确认消息的准确性。其中有一种攻击方式是中间人攻击：具体来说就是攻击者介入发送者和接收者的中间，对发送者伪装成接收者，对接收者伪装者成发送者，从而能在无需破解数字签名的前提下完成攻击。</p>
+<h3 id="伪装"><a href="#伪装" class="headerlink" title="伪装"></a>伪装</h3><p>例如攻击者伪装成真正的发送者，执行一些操作。</p>
+<h3 id="重放"><a href="#重放" class="headerlink" title="重放"></a>重放</h3><p>是指攻击者发送一个目的主机已接收过的包，来达到欺骗系统的目的，主要用于身份认证过程，破坏认证的正确性。攻击者不用解密请求的内容，但如果知道这个请求的含义（url中api的名字通常会暴漏请求的含义），就可以做到攻击（加时间戳可以fix）。看到一个通俗易懂的例子：</p>
+<ul>
+<li>A向服务器发送了一条请求（附带了签名并进行了加密），是像B打一笔钱。</li>
+<li>服务器接收到请求并执行了相应的操作。</li>
+<li>但是B拿到了这个流量，并重复的发给服务器。进行欺骗。<h3 id="抵赖"><a href="#抵赖" class="headerlink" title="抵赖"></a>抵赖</h3>发送方不真实的否认已经发送的消息。<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3>其实攻击者往往为了达到目的，不仅仅使用某一种方法，通常是组合拳，而且这些方法并不是完全独立了，也有相应的耦合。总的来说这些攻击都是在破坏信息的几个方面。</li>
+</ul>
+<p><img src="https://s3.ax1x.com/2021/01/13/sNUay8.png"></p>
+<h2 id="How如何使我们的数据更安全"><a href="#How如何使我们的数据更安全" class="headerlink" title="How如何使我们的数据更安全"></a>How如何使我们的数据更安全</h2><h3 id="保证机密性"><a href="#保证机密性" class="headerlink" title="保证机密性"></a>保证机密性</h3><p>发送方对消息进行加密，接收方解密，中途即使被窃听，由于缺少密钥，拿到的是乱码，不知道消息的内容。</p>
+<h4 id="对称加密"><a href="#对称加密" class="headerlink" title="对称加密"></a>对称加密</h4><p>在对称加密中，只用同一个密钥来加密和解密信息。至于为什么可以用同一串数字加密和解密，加密算法基础是XOR（异或），加强版本有DES(已能被破解)、三重DES、AES、Rijndael等。现在用的大都是AES。</p>
+<p><img src="https://s3.ax1x.com/2021/01/13/sNUdOS.png"></p>
+<p><strong>- 优：快</strong><br><strong>- 不足：密钥配送问题，对方如果要能解密你的信息，就必须把密钥发送给对方，中途一旦被其他人截胡，就可以直接解密之后你们的通信内容了。</strong></p>
+<h4 id="非对称加密"><a href="#非对称加密" class="headerlink" title="非对称加密"></a>非对称加密</h4><p>考虑到对称加密的劣势，思考有没有一种方法是黑客即使在通信的过程中获取了你们传递的密钥也无法破译消息？非对称加密就解决了这个问题，现在广泛使用的是RSA算法。<br>（1）发送者只需要加密密钥。<br>（2）接收者只需要解密密钥。<br>（3）解密密钥不参与传输，所以不能被窃听者拿到。<br>（4）加密密钥被窃听者拿到也无所谓。</p>
+<p><img src="https://s3.ax1x.com/2021/01/13/sNU0eg.png"></p>
+<p><strong>- 优：不用担心密钥配送问题，更好的保证了消息的机密性。</strong><br><strong>- 不足：加解密算法复杂，速度慢。解决了密钥配送问题，但无法防御中间人攻击，此外还需要确认B发来的公钥是否真的属于B（这就需要公钥证书）。</strong></p>
+<h3 id="保证完整性"><a href="#保证完整性" class="headerlink" title="保证完整性"></a>保证完整性</h3><p>除了保证消息的机密性外，我们还要确保消息中途没有被修改过。</p>
+<h4 id="单向散列函数"><a href="#单向散列函数" class="headerlink" title="单向散列函数"></a>单向散列函数</h4><p>就是我们工作中常用来比较两个文件是否相同的sha1,sha256,md5等。</p>
+<h3 id="保证真实性-amp-完整性"><a href="#保证真实性-amp-完整性" class="headerlink" title="保证真实性&amp;完整性"></a>保证真实性&amp;完整性</h3><h4 id="消息认证码"><a href="#消息认证码" class="headerlink" title="消息认证码"></a>消息认证码</h4><p>消息认证码（MAC）：将发送者和接收者之间的“共享密钥”和“消息”进行混合后计算出散列值。HMAC运算利用hash算法，以一个消息M和一个密钥K作为输入，生成一个定长的消息摘要作为输出。</p>
+<p><img src="https://s3.ax1x.com/2021/01/13/sNUBwQ.md.png"></p>
+<p>（1）A和B事先共享密钥<br>（2）A使用密钥+消息计算MAC值<br>（3）A将消息和MAC两者同时发送给接收者B<br>（4）B也用共享密钥根据接收到的消息计算出一个MAC值<br>（5）B对比自己计算的MAC和接收的MAC值是否一致，若一致，则可以判断出消息是来自A，并且没有被篡改过。<br>在消息认证码中，A和B要使用同一个密钥，这个密钥是不能被攻击者拿到的，否则认证就没有作用了。这种存在密钥配送问题的解决方法，可以使用非对称密码（将共享密钥加密）、密钥分配中心等。<br><strong>- 优：可以识别消息是否被篡改和发送者是否被伪装，同时保证了完整性和真实性。</strong><br><strong>- 不足：由于A和B拥有同样的密钥，可以计算相同的MAC,在出具借条的场景中无法使用，因为无法防止否认。</strong></p>
+<h3 id="保证完整性-amp-真实性-amp-不可否认"><a href="#保证完整性-amp-真实性-amp-不可否认" class="headerlink" title="保证完整性&amp;真实性&amp;不可否认"></a>保证完整性&amp;真实性&amp;不可否认</h3><h4 id="数字签名"><a href="#数字签名" class="headerlink" title="数字签名"></a>数字签名</h4><p>既然要具有不可否认性，就不能使用同样的密钥加密。思路是，用自己的私钥生成签名，验证者通过公钥验证但无法用此公钥生成同样的签名（私钥签名，公钥验证），这就是像非对称密码中对消息加密解密的相反过程（公钥加密，私钥解密）。此外，不管是数字签名还是非对称密钥，不可泄漏的密钥不能参与传输，只有一方持有。<br>（1）我们这次不使用消息直接进行签名，是因为消息不论多么长，散列值试固定了，所以对散列值进行签名更加简单。<br>（2）最后对比的是散列值：通过公钥解密签名后的消息的散列值和通过直接对消息计算得出的散列值。<br><strong>-优：保证了完整性、真实性和不可否认性。</strong><br><strong>-不足：我们看到消息没有加密就发送了，无法保证机密性。因为数字签名确实不是保证机密性的。我们可以同时使用加密和签名组合的方法解决这个问题。在综合应用的时候会讲。</strong></p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p><img src="https://s3.ax1x.com/2021/01/13/sNUDoj.png"></p>
+<hr>
+<h2 id="综合应用实例：TLS"><a href="#综合应用实例：TLS" class="headerlink" title="综合应用实例：TLS"></a>综合应用实例：TLS</h2><h3 id="TLS-SSL"><a href="#TLS-SSL" class="headerlink" title="TLS/SSL"></a>TLS/SSL</h3><p>SSL/TLS是世界上应用最广泛的密码通信方法，它综合应用了对称密码、非对称密、数字签名、伪随机数生成器。具有消息加密，身份认证，防篡改等。<br><em>基本过程：</em><br><img src="https://s3.ax1x.com/2021/01/13/sNUsFs.png"></p>
+<ul>
+<li><p>客户端通过服务端证书得到了服务器的合法公钥，完成服务器认证。</p>
+</li>
+<li><p>服务器通过客户端证书得到了客户端的合法公钥，完成客户端认证。（当需要客户端认证的时候）</p>
+</li>
+<li><p>客户端和服务器生成了密码通信中使用的共享密钥。</p>
+</li>
+<li><p>客户端和服务器生成了消息认证码中使用的共享密钥。是整个握手阶段出现的第三个随机数。</p>
+</li>
+<li><p>客户端随机数、服务端随机数、预备主密码。根据预备主密码客户端和服务器- 通过约定好的单向散列函数生成同样的主密码。该主密码怎么参与后面的通信呢？作用如下：<br>  （1）作为对称密码的密钥进行消息的加密/解密。（客户端&lt;–&gt;服务器）<br>  （2）作为消息认证码的密钥，确认客户端和服务器的真实性和一致性。（客户端&lt;–&gt;服务器）</p>
+<table>
+<thead>
+<tr>
+<th align="left">密码技术</th>
+<th align="right">作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">非对称加密（公钥密码）</td>
+<td align="right">加密预备主密码</td>
+</tr>
+<tr>
+<td align="left">单向散列函数</td>
+<td align="right">伪随机数生成器</td>
+</tr>
+<tr>
+<td align="left">数字签名</td>
+<td align="right">验证服务器和客户端证书</td>
+</tr>
+<tr>
+<td align="left">伪随机数生成器</td>
+<td align="right">生成预备主密码</td>
+</tr>
+<tr>
+<td align="left">单元格</td>
+<td align="right">单元格</td>
+</tr>
+</tbody></table>
+</li>
+</ul>
+<p><em><strong>关于证书的验证：<br>在使用非对称加密的时候，我们需要确认对方给我们的公钥确实是属于他的，这就需要一个第三方的认证机构。流程是这样的:</strong></em><br><strong>服务端生成密钥对，并在认证机构注册自己的公钥，认证机构用自己的私钥对服务端的公钥施加数字签名并生成证书，证书中包含了服务器的公钥和第三方机构的签名。客户端拿到证书，用机构的公钥验证签名，解密后的公钥和证书中的服务器公钥进行对比，确认服务端的公钥的合法性。就是相当于信任第三方机构的公钥，来验证客户的公钥的合法性。</strong></p>
+]]></content>
+      <categories>
+        <category>code</category>
+      </categories>
+      <tags>
+        <tag>密码技术</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Error Handling in Nodejs</title>
+    <url>/2021/01/14/Error-Handling-in-Nodejs/</url>
+    <content><![CDATA[<!-- TOC -->
+
+<ul>
+<li><a href="#%E8%83%8C%E6%99%AF">背景</a></li>
+<li><a href="#nodejs%E4%B8%AD%E5%BC%82%E5%B8%B8%E6%8A%9B%E5%87%BA%E5%92%8C%E5%A4%84%E7%90%86%E7%9A%845%E7%A7%8D%E6%96%B9%E5%BC%8F">nodejs中异常抛出和处理的5种方式</a></li>
+<li><a href="#%E5%BC%82%E5%B8%B8%E7%9A%842%E5%A4%A7%E5%88%86%E7%B1%BB%E5%92%8C%E5%A4%84%E7%90%86%E7%AD%96%E7%95%A5">异常的2大分类和处理策略</a><ul>
+<li><a href="#%E6%93%8D%E4%BD%9C%E5%A4%B1%E8%B4%A5">操作失败</a></li>
+<li><a href="#%E7%A8%8B%E5%BA%8F%E5%91%98%E5%A4%B1%E8%AF%AF">程序员失误</a></li>
+<li><a href="#%E5%A4%84%E7%90%86%E5%A4%B1%E8%B4%A5">处理失败</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BD%95%E6%97%B6%E4%BB%A5%E4%BB%80%E4%B9%88%E6%96%B9%E5%BC%8F%E6%8A%9B%E5%87%BA%E5%BC%82%E5%B8%B8throw-callback-%E8%BF%98%E6%98%AF-eventemitter">何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）</a></li>
+<li><a href="#%E7%BC%96%E5%86%99%E5%87%BD%E6%95%B0%E6%97%B6%E7%9A%84%E5%BB%BA%E8%AE%AE">编写函数时的建议</a></li>
+<li><a href="#reference">Reference</a></li>
+</ul>
+<!-- /TOC -->
+<span id="more"></span>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>Nodejs是单线程,这会导致如果exception没有合适的处理，会导致整个程序的退出。所以要谨慎处理exception。以及区分不同的异常和何时使用哪种异常抛出方式。</p>
+<hr>
+<h2 id="nodejs中异常抛出和处理的5种方式"><a href="#nodejs中异常抛出和处理的5种方式" class="headerlink" title="nodejs中异常抛出和处理的5种方式"></a>nodejs中异常抛出和处理的5种方式</h2><ol>
+<li>Throw the error as exception<br>这是最熟悉的一种异常方式，跟其他的编程语言时类似的。这类异常如果没有被处理，会导致程序的退出。 <figure class="highlight csharp"><table><tr><td class="code"><pre><span class="line"><span class="function">function <span class="title">calculateSquare</span>(<span class="params">number, callback</span>)</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>) &#123;</span><br><span class="line"><span class="keyword">throw</span> <span class="keyword">new</span> Error(<span class="string">&quot;Argument of type number is expected.&quot;</span>));</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">return</span> number * number;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>Pass the error to a callback<br>callback是处理异步操作的返回结果的。把错误传给一个callback，这个函数正是为了处理异常和处理异步操作返回结果的。 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number, callback</span>) </span>&#123;</span><br><span class="line"><span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>) &#123;</span><br><span class="line">callback(<span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">&quot;Argument of type number is expected.&quot;</span>));</span><br><span class="line"><span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">callback(<span class="literal">null</span>, result);</span><br><span class="line">&#125;, <span class="number">1000</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">let</span> callback = <span class="function">(<span class="params">error, result</span>) =&gt;</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (error !== <span class="literal">null</span>) &#123;</span><br><span class="line"><span class="built_in">console</span>.log(<span class="string">&quot;Caught error: &quot;</span> + <span class="built_in">String</span>(error));</span><br><span class="line"><span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="built_in">console</span>.log(result);</span><br><span class="line">&#125;;</span><br><span class="line">calculateSquare(<span class="string">&#x27;s&#x27;</span>, callback);</span><br></pre></td></tr></table></figure></li>
+<li>Pass the error to a reject Promise function(ES6出现了Promise)<br>Promise中reject返回的内容可以被catch拿到，resolve返回的内容可以被then拿到 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number</span>) </span>&#123;</span><br><span class="line"><span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve,reject</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>)&#123;</span><br><span class="line">reject(<span class="string">&#x27;Argument of type number is expected&#x27;</span>)</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">resolve(result)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)</span><br><span class="line">&#125;</span><br><span class="line">calculateSquare(<span class="number">2</span>).</span><br><span class="line">then(<span class="function"><span class="params">res</span>=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(res);</span><br><span class="line">&#125;).</span><br><span class="line"><span class="keyword">catch</span>(<span class="function"><span class="params">error</span>=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(error);</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure></li>
+<li>Emit an error event on an EventEmitter<br>通过EventEmitter可以定义自己的事件，事件触发和事件监听。当EventEmitter（事件）内发生错误时，典型的操作是发出error事件，如果该事件没有监听error事件，那么当error事件被发射时，node进程将退出。为了防止node进程退出，应该为error事件添加监听器。 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="keyword">const</span> emitter = <span class="built_in">require</span>(<span class="string">&#x27;events&#x27;</span>)</span><br><span class="line"><span class="keyword">const</span> myEmitter = <span class="keyword">new</span> emitter();</span><br><span class="line">myEmitter.on(<span class="string">&#x27;error&#x27;</span>,<span class="function">(<span class="params">err</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(<span class="string">&#x27;whoops! there was an error&#x27;</span>)</span><br><span class="line">&#125;)</span><br><span class="line">myEmitter.emit(<span class="string">&#x27;error&#x27;</span>,<span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">&#x27;whoops&#x27;</span>));</span><br><span class="line"><span class="comment">//通过发射error而抛出的异常必须通过监听error事件捕获或</span></span><br><span class="line"><span class="comment">//process.on(&#x27;uncaughtException&#x27;, (err)，try catch则不行。</span></span><br></pre></td></tr></table></figure></li>
+<li>Async/Await(ES7)<br>可以通过catch同步代码的方式catch异步代码了，不需要写then。Resolve的参数就是返回值，reject的参数就是catch里的error. <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number</span>) </span>&#123;</span><br><span class="line"><span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve,reject</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>)&#123;</span><br><span class="line">reject(<span class="string">&#x27;Argument of type number is expected&#x27;</span>)</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">resolve(result)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)</span><br><span class="line">&#125;</span><br><span class="line">(<span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">test</span>(<span class="params"></span>)</span>&#123;</span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line"><span class="keyword">let</span> res = <span class="keyword">await</span> calculateSquare(<span class="string">&#x27;s&#x27;</span>);</span><br><span class="line"><span class="built_in">console</span>.log(res);</span><br><span class="line">&#125; <span class="keyword">catch</span> (error) &#123;</span><br><span class="line"><span class="built_in">console</span>.log(error)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)()</span><br></pre></td></tr></table></figure></li>
+</ol>
+<hr>
+<h2 id="异常的2大分类和处理策略"><a href="#异常的2大分类和处理策略" class="headerlink" title="异常的2大分类和处理策略"></a>异常的2大分类和处理策略</h2><h3 id="操作失败"><a href="#操作失败" class="headerlink" title="操作失败"></a>操作失败</h3><p>不是程序的bug,是系统本身（oom…）,网络问题，远程服务（5xx，ECONNREFUSED…）</p>
+<ul>
+<li>连接不到服务器</li>
+<li>无法解析主机名</li>
+<li>无效的用户输入</li>
+<li>请求超时</li>
+<li>服务器返回500</li>
+<li>套接字被挂起</li>
+<li>系统内存不足<h3 id="程序员失误"><a href="#程序员失误" class="headerlink" title="程序员失误"></a>程序员失误</h3>是程序里的Bug。这些错误往往可以通过修改代码避免。它们永远都没法被有效的处理。</li>
+<li>读取 undefined 的一个属性</li>
+<li>调用异步函数没有指定回调</li>
+<li>该传对象的时候传了一个字符串</li>
+<li>该传IP地址的时候传了一个对象<h3 id="处理失败"><a href="#处理失败" class="headerlink" title="处理失败"></a>处理失败</h3></li>
+<li>直接处理<br>  有的时候该做什么很清楚。如果你在尝试打开日志文件的时候得到了一个ENOENT错误，很有可能你是第一次打开这个文件，你要做的就是首先创建它。更有意思的例子是，你维护着到服务器（比如数据库）的持久连接，然后遇到了一个“socket hang-up”的异常。这通常意味着要么远端要么本地的网络失败了。很多时候这种错误是暂时的，所以大部分情况下你得重新连接来解决问题。（这和接下来的重试不大一样，因为在你得到这个错误的时候已经不必要重试了）</li>
+<li>把出错扩散到客户端<br> 如果你不知道怎么处理这个异常，最简单的方式就是放弃你正在执行的操作，清理所有开始的，然后把错误传递给客户端。（怎么传递异常是另外一回事了，接下来会讨论）。这种方式适合错误短时间内无法解决的情形。比如，用户提交了不正确的JSON，你再解析一次是没什么帮助的。</li>
+<li>重试操作<br>  对于那些来自网络和远程服务的错误，有的时候重试操作就可以解决问题。比如，远程服务返回了503（服务不可用错误），你可能会在几秒种后重试。如果确定要重试，你应该清晰的用文档记录下将会多次重试，重试多少次直到失败,以及两次重试的间隔。 另外，不要每次都假设需要重试。如果在栈中很深的地方（比如，被一个客户端调用，而那个客户端被另外一个由用户操作的客户端控制），这种情形下快速失败让客户端去重试会更好。如果栈中的每一层都觉得需要重试，用户最终会等待更长的时间，因为每一层都没有意识到下层同时也在尝试。</li>
+<li>直接崩溃<br>  对于那些本不可能发生的错误，或者由程序员失误导致的错误（比如无法连接到同一程序里的本地套接字），可以记录一个错误日志然后直接崩溃。其它的比如内存不足这种错误，是JavaScript这样的脚本语言无法处理的，崩溃是十分合理的。（即便如此，在child_process.exec这样的分离的操作里，得到ENOMEM错误，或者那些你可以合理处理的错误时，你应该考虑这么做）。在你无计可施需要让管理员做修复的时候，你也可以直接崩溃。如果你用光了所有的文件描述符或者没有访问配置文件的权限，这种情况下你什么都做不了，只能等某个用户登录系统把东西修好。</li>
+<li>记录错误，其他什么都不做<br>  有的时候你什么都做不了，没有操作可以重试或者放弃，没有任何理由崩溃掉应用程序。举个例子吧，你用DNS跟踪了一组远程服务，结果有一个DNS失败了。除了记录一条日志并且继续使用剩下的服务以外，你什么都做不了。但是，你至少得记录点什么（凡事都有例外。如果这种情况每秒发生几千次，而你又没法处理，那每次发生都记录可能就不值得了，但是要周期性的记录）。</li>
+<li>立刻崩溃,重启<br>  崩溃是失误来临时最快的恢复可靠服务的方法。奔溃应用程序唯一的负面影响是相连的客户端临时被扰乱。在一个完备的分布式系统里，客户端必须能够通过重连和重试来处理服务端的错误。不管 NodeJS 应用程序是否被允许崩溃，网络和系统的失败已经是一个事实了。</li>
+</ul>
+<hr>
+<h2 id="何时以什么方式抛出异常（Throw，-Callback-还是-EventEmitter）"><a href="#何时以什么方式抛出异常（Throw，-Callback-还是-EventEmitter）" class="headerlink" title="何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）"></a>何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）</h2><ul>
+<li>throw以同步的方式传递异常–也就是在函数被调用处的相同的上下文。如果调用者（或者调用者的调用者）用了try/catch，则异常可以捕获。如果所有的调用者都没有用，那么程序通常情况下会崩溃（异常也可能会被进程级的uncaughtException）。</li>
+<li>Callback 是最基础的异步传递事件的一种方式。用户传进来一个函数（callback），之后当某个异步操作完成后调用这个 callback。通常 callback 会以callback(err,result)的形式被调用，这种情况下， err和 result必然有一个是非空的，取决于操作是成功还是失败。</li>
+<li>更复杂的情形是，函数没有用 Callback 而是返回一个 EventEmitter 对象，调用者需要监听这个对象的 error事件。这种方式在两种情况下很有用。</li>
+<li>当你在做一个可能会产生多个错误或多个结果的复杂操作的时候。比如，有一个请求一边从数据库取数据一边把数据发送回客户端，而不是等待所有的结果一起到达。在这个例子里，没有用 callback，而是返回了一个 EventEmitter，每个结果会触发一个row 事件，当所有结果发送完毕后会触发end事件，出现错误时会触发一个error事件。</li>
+<li>用在那些具有复杂状态机的对象上，这些对象往往伴随着大量的异步事件。例如，一个套接字是一个EventEmitter，它可能会触发“connect“，”end“，”timeout“，”drain“，”close“事件。这样，很自然地可以把”error“作为另外一种可以被触发的事件。在这种情况下，清楚知道”error“还有其它事件何时被触发很重要，同时被触发的还有什么事件（例如”close“），触发的顺序，还有套接字是否在结束的时候处于关闭状态。</li>
+<li>callback和EventEmitter通常2选1。</li>
+</ul>
+<hr>
+<h2 id="编写函数时的建议"><a href="#编写函数时的建议" class="headerlink" title="编写函数时的建议"></a>编写函数时的建议</h2><p>清楚的知道函数是做什么的，预期参数—参数的类型—参数的额外约束—返回值—<br>还要知道：调用者可能会遇到的操作失败，怎么处理这个失败（抛出，传递给callback，emitter）。<br>使用ERROR对象或它的子类，并且实现 Error 的协议<br>所有错误要么使用 Error 类要么使用它的子类。你应该提供name和message属性。建议在捕获一些比较底层的异常时封装一层，将原始的error转换成自己的error类，方便调用者理解和处理。</p>
+<hr>
+<h2 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h2><p><a href="https://www.joyent.com/node-js/production/design/errors">https://www.joyent.com/node-js/production/design/errors</a><br><a href="https://code.oneapm.com/nodejs/2015/04/13/nodejs-errorhandling/">https://code.oneapm.com/nodejs/2015/04/13/nodejs-errorhandling/</a></p>
+]]></content>
+      <categories>
+        <category>code</category>
+      </categories>
+      <tags>
+        <tag>nodejs</tag>
+        <tag>error-handler</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>书中碎语</title>
+    <url>/2021/01/23/%E4%B9%A6%E4%B8%AD%E7%A2%8E%E8%AF%AD/</url>
+    <content><![CDATA[<p>热恋之中，他反复吟诵这个名字，觉得它是灵感与生命的来源。但当恋情未及苍老便告消逝，他就发现真名的力量变化转向，成为一句诅咒。他不能忍受叫出这个名字时所发出的声音，仿佛每个音节都会直接击中自己的心脏；也不能再次看见哪怕只是近似的字形，它们会使人晕眩得近乎失明。</p>
+<span id="more"></span>
+
+<p>若要真的从头再来，方法只有一种，那就是把自己彻底变成另一个人。不是变化你的生活习惯，比方说戒烟或者戒酒；也不是改变容貌声线；而是将你曾经交给对方的那一部分，把你曾经送到对方手中的那一半生命割除。这样子，你就残缺不全了。日后会不会健全长肉？不知道。将来是否反而更加完整健康？或许会。但至少你成了新人。</p>
+<p>没一段感情的发生与结束，其实都是场记忆的战争。受过伤害的，必将在新一轮关系的最初就迟疑畏惧，甚或仓皇退缩，因为他记得那么清楚。他害怕的，不是眼前的人，而是过去的人。他不只是在和新认识的朋友交往，他同时还在和自己的记忆协商、谈判与作战。对方可不知道，这样的关系何等艰难，因为与他角力的是一些过去的陌生人。</p>
+<p>少年时代，我也和许多文艺青年一样，喜欢读纳兰性德，例如他在二十多岁时写下的这一句：“被酒莫惊春睡重，睹书消得泼茶香，当时只道是寻常。”容若是贵族公子，才活了三十一年，对于人生变故的体悟却是同龄人很难领悟的。所以当时虽然觉得这首词好，其实我并没读懂。我们也有过短暂且寻常的时候。尽管未必能够对赌书中典故的出处，也不至于笑闹得杯覆茶洒，但是我们曾经讨论自己喜欢的作家，曾经用同一只杯子喝酒。事后回想，这岂不都是寻常风景？“当时只道是寻常”这句话本身就把平常变成了异常，所有我们以为会成为习惯的平凡人事皆是无常偶然的诡局。只有事后追忆，才明白那寻常是何等的殊异可贵。</p>
+<p><em><strong><p align="right">–《我执》梁文道</p></strong></em><br>我不知道什么叫爱情。我只知道，如果那张脸庞没有使你感觉到一种甜蜜的惆怅，一种依恋的哀愁，那你肯定还没有爱。</p>
+<p>每逢节日，独自在灯下，心中就有一种非常浓郁的寂寞，浓郁得无可排遣，自斟自饮生命的酒，别有一番酩酊。</p>
+<p>世界是我的食物。人只用少量时间进食，大部分时间在消化。独处就是我消化世界。</p>
+<p>学会孤独，学会与自己交谈，听自己说话–就这样去学会深刻。</p>
+<p>分寸感是成熟的爱的标志，它懂得遵守人与人之间必要的距离，这个距离意味着对于对方作为独立人格的尊重，包括尊重对方独处的权利。</p>
+<p><em><strong><p align="right">–《人与永恒》周国平</p></strong></em></p>
+<p>有许多人回忆过去的快乐，恨不能与旧人重逢，恨不能年华停伫，事实上，却是天涯远隔，是韶光飞逝，即使真有一天与故人相会，心情也像在冰雪封冻的极地，不免被时空的箭射中而悲伤不已吧！</p>
+<p>说到逃情，不只是逃人世的情爱，有时候心中有挂也是情牵。有一回，暖香吹月时节与友在碧潭共醉，醉后扶上木兰舟，欲纵舟大饮，朋友说：“也要楚天阔，也要大江流，也要望不见前后，才能对月再下酒”。死拒不饮，这就是心中有挂，即使挂的是楚天大江，终不能无虑，不能万情皆忘。</p>
+<p>关于上乘的喝法，春天的时候可以面对满园怒放的杜鹃细饮五加皮；夏天的时候，在满树狂花中痛饮啤酒；秋日薄暮，用菊花煮竹叶青，人与海棠据醉；冬寒时节，则面对篱笆见的忍冬花，用腊梅温一壶大曲。这种种，就到了无物不可下酒的境界。</p>
+<p><em><strong><p align="right">–《人生最美是清欢》林清玄</p></strong></em></p>
+]]></content>
+      <categories>
+        <category>读书</category>
+      </categories>
+      <tags>
+        <tag>我执</tag>
+        <tag>人生最美是清欢</tag>
+        <tag>人与永恒</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>从删除文件窥视Linux文件系统</title>
+    <url>/2021/01/13/%E4%BB%8E%E5%88%A0%E9%99%A4%E6%96%87%E4%BB%B6%E7%AA%A5%E8%A7%86Linux%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F/</url>
+    <content><![CDATA[<!-- TOC -->
+
+<ul>
+<li><a href="#%E8%83%8C%E6%99%AF">背景</a></li>
+<li><a href="#poc">poc</a><ul>
+<li><a href="#%E5%88%A0%E9%99%A4%E5%89%8D">删除前</a></li>
+<li><a href="#%E5%88%A0%E9%99%A4%E5%90%8E">删除后</a></li>
+<li><a href="#%E6%81%A2%E5%A4%8D%E5%88%A0%E9%99%A4%E7%9A%84%E6%96%87%E4%BB%B6">恢复删除的文件</a></li>
+</ul>
+</li>
+<li><a href="#poc%E7%BB%93%E8%AE%BA">POC结论</a></li>
+<li><a href="#%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F">文件系统</a><ul>
+<li><a href="#%E5%88%9B%E5%BB%BA%E6%96%87%E4%BB%B6%E7%9B%AE%E5%BD%95">创建文件&amp;目录</a><ul>
+<li><a href="#%E6%96%87%E4%BB%B6">文件</a></li>
+<li><a href="#%E7%9B%AE%E5%BD%95">目录</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#reference">Reference:</a></li>
+</ul>
+<!-- /TOC -->
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>项目中用k8s的livesness check 功能做容器的健康探测，主要分3中方式：1.http request 探测2.exec command 3.tcp 探测。我负责的模块不是一个sevice，所以没有选择1，感觉2好像更符合我的应用场景。简单来说就是k8s可以定期执行一个命令或者一个shell文件，功能可能就是查看一个文件是否存在来测试当前的容器是否健康。而我的实现就是查看文件是否存在，若存在表明健康并删除，模块中有个定时器会定时再创建这个文件。</p>
+<span id="more"></span>
+
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="meta">#!/usr/bin/env bash</span></span><br><span class="line"><span class="comment">#check health file is exist and delete it</span></span><br><span class="line">HEALTHYFILE = <span class="string">&quot;/tmp/healthy&quot;</span></span><br><span class="line"><span class="keyword">if</span> [ ! -f <span class="string">&quot;<span class="variable">$&#123;HEALTHYFILE&#125;</span>&quot;</span> ];<span class="keyword">then</span></span><br><span class="line"><span class="built_in">exit</span> 1</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line"><span class="comment">#delete healthy file</span></span><br><span class="line">rm <span class="string">&quot;<span class="variable">$&#123;HEALTHYFILE&#125;</span>&quot;</span></span><br><span class="line"><span class="built_in">exit</span> 0</span><br><span class="line"><span class="keyword">fi</span></span><br><span class="line">livenessProbe:</span><br><span class="line"><span class="built_in">exec</span>:</span><br><span class="line"><span class="built_in">command</span>:</span><br><span class="line">- /bin/sh</span><br><span class="line">- /usr/<span class="built_in">local</span>/src/sandboxapi/src/healthCheck.sh</span><br><span class="line">initialDelaySeconds: 60</span><br><span class="line">periodSeconds: 120</span><br><span class="line">setInterval(() =&gt; &#123;</span><br><span class="line"><span class="keyword">if</span>(msgProcessCount !== 0 &amp;&amp; !fs.existsSync(HEALTHYFile))&#123;</span><br><span class="line">fs.writeFileSync(HEALTHYFile, <span class="string">&#x27;&#x27;</span>);//mode Default: 0o666,flag Default:<span class="string">&#x27;w&#x27;</span></span><br><span class="line">&#125;</span><br><span class="line">msgProcessCount=0;</span><br><span class="line">&#125;, HEALTHYTIME*1000);</span><br></pre></td></tr></table></figure>
+<p>command shell里面如果文件占用会删除失败吗？遂研究了一下，在linux环境下，如果文件正在被占用（读写），删除操作会发生什么？</p>
+<h2 id="poc"><a href="#poc" class="headerlink" title="poc"></a>poc</h2><p>死循环读data文件中的内容，并打印出来pid,fd和文件内容（helloWorld）。</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;sys/stat.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;fcntl.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> BUFFER_SIZE 30</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span>&#123;</span><br><span class="line">    <span class="keyword">int</span> fd;</span><br><span class="line">    <span class="keyword">int</span> i=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">char</span> buffer[BUFFER_SIZE];</span><br><span class="line">    <span class="keyword">if</span>((fd=<span class="built_in">open</span>(<span class="string">&quot;data&quot;</span>,O_RDONLY))==<span class="number">-1</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Open file Error\n&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">int</span> pid=<span class="built_in">getpid</span>();</span><br><span class="line">    <span class="keyword">int</span> n=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">        ++i;</span><br><span class="line">        n=<span class="built_in">read</span>(fd,buffer,BUFFER_SIZE<span class="number">-1</span>);</span><br><span class="line">        <span class="keyword">if</span>(n==<span class="number">-1</span>)&#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;read Error\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    buffer[n]=<span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot; %d pid:%d, fd:%d, content:%s\n&quot;</span>,i,pid,fd,buffer);</span><br><span class="line">    <span class="built_in">sleep</span>(<span class="number">10</span>);</span><br><span class="line">    <span class="built_in">lseek</span>(fd,<span class="number">0L</span>,SEEK_SET);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">close</span>(fd);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="删除前"><a href="#删除前" class="headerlink" title="删除前"></a>删除前</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ./delete_file</span><br><span class="line">1 pid:16395, fd:3, content:helloWorld</span><br><span class="line">2 pid:16395, fd:3, content:helloWorld</span><br><span class="line">3 pid:16395, fd:3, content:helloWorld</span><br><span class="line">4 pid:16395, fd:3, content:helloWorld</span><br><span class="line">5 pid:16395, fd:3, content:helloWorld</span><br><span class="line">6 pid:16395, fd:3, content:helloWorld</span><br></pre></td></tr></table></figure>
+<p><strong>我们查看delete_file进程打开的文件句柄的情况，使用ls -ilL:<br>-i, –inode 印出每个文件的 inode 号<br>-L, –dereference 当显示符号链接的文件信息时，显示符号链接所指示的对象而并非符号链接本身的信息。</strong></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ll /proc/21594/fd/</span><br><span class="line">total 0</span><br><span class="line">dr-x------ 2 winter winter 0 Jul 25 00:11 .</span><br><span class="line">dr-xr-xr-x 9 winter winter 0 Jul 25 00:11 ..</span><br><span class="line">lrwx------ 1 winter winter 64 Jul 25 00:11 0 -&gt; /dev/pts/0</span><br><span class="line">lrwx------ 1 winter winter 64 Jul 25 00:11 1 -&gt; /dev/pts/0</span><br><span class="line">lrwx------ 1 winter winter 64 Jul 25 00:11 2 -&gt; /dev/pts/0</span><br><span class="line">lr-x------ 1 winter winter 64 Jul 25 00:11 3 -&gt; /home/winter/Dev/test_delete_file/data</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>发现fd下面是符号链接文件3是指向我们的data文件，所以查看一下转向对象的信息。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ls -ilL /proc/21594/fd/3</span><br><span class="line">1054025 -rw-rw-r-- 1 winter winter 12 Jul 25 00:09 /proc/21594/fd/3</span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ls -ilL data </span><br><span class="line">1054025 -rw-rw-r-- 1 winter winter 12 Jul 25 00:09 data</span><br></pre></td></tr></table></figure>
+<p>意料之中data文件和fd/3的node号是一样的。因为L链接文件指向的是指向对象的信息而非本身。</p>
+<h3 id="删除后"><a href="#删除后" class="headerlink" title="删除后"></a>删除后</h3><p>查看原进程的输出：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">7 pid:21594, fd:3, content:helloWorld</span><br><span class="line">8 pid:21594, fd:3, content:helloWorld</span><br><span class="line">9 pid:21594, fd:3, content:helloWorld</span><br><span class="line">10 pid:21594, fd:3, content:helloWorld</span><br><span class="line">11 pid:21594, fd:3, content:helloWorld</span><br><span class="line">12 pid:21594, fd:3, content:helloWorld</span><br><span class="line">13 pid:21594, fd:3, content:helloWorld</span><br><span class="line">14 pid:21594, fd:3, content:helloWorld</span><br><span class="line">15 pid:21594, fd:3, content:helloWorld</span><br><span class="line">16 pid:21594, fd:3, content:helloWorld</span><br></pre></td></tr></table></figure>
+<p>我们发现原来进程的输出内容没有变化，但使用ls已经查看不到该文件了。再次查看进程下的fd状况：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ls -il /proc/21594/fd/</span><br><span class="line">total 0</span><br><span class="line">198671 lrwx------ 1 winter winter 64 Jul 25 00:11 0 -&gt; /dev/pts/0</span><br><span class="line">198672 lrwx------ 1 winter winter 64 Jul 25 00:11 1 -&gt; /dev/pts/0</span><br><span class="line">198673 lrwx------ 1 winter winter 64 Jul 25 00:11 2 -&gt; /dev/pts/0</span><br><span class="line">198674 lr-x------ 1 winter winter 64 Jul 25 00:11 3 -&gt; <span class="string">&#x27;/home/winter/Dev/test_delete_file/data (deleted)&#x27;</span></span><br></pre></td></tr></table></figure>
+<p>可以发现删除后，fd3指向了一个已经删除的文件。我们使用-L参数查看一下它指向的内容。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ls -ilL /proc/21594/fd/3</span><br><span class="line">1054025 -rw-rw-r-- 0 winter winter 12 Jul 25 00:09 /proc/21594/fd/3</span><br></pre></td></tr></table></figure>
+<p><strong>我们再次发现，链接指向的已删除文件的i节点号与已被删除的data文件的节点号一致。这说明虽然 data.txt 在相应目录中已经被删除，但是由于有其他进程打开这一文件后还未关闭，操作系统其实还为这些进程保留了磁盘上被打开的文件内容。</strong><br>重新创建DATA文件，并改变内容：<br>重新创建data文件后，进程输出的内容与以前并无不同。查看下进程fd：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ls -il /proc/21594/fd/3</span><br><span class="line">198674 lr-x------ 1 winter winter 64 Jul 25 00:11 /proc/21594/fd/3 -&gt; <span class="string">&#x27;/home/winter/Dev/test_delete_file/data (deleted)&#x27;</span></span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ls -ilL data </span><br><span class="line">1054026 -rw-rw-r-- 1 winter winter 13 Jul 25 21:48 data</span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ls -ilL /proc/21594/fd/3</span><br><span class="line">1054025 -rw-rw-r-- 0 winter winter 12 Jul 25 00:09 /proc/21594/fd/3</span><br></pre></td></tr></table></figure>
+<p>由此看出，即使重新创建了同名文件，进程fd3依旧指向原来被删除的文件。因而可以认为，新建的同名文件与原文件及原进程无任何关系，新建的同名文件未被原进程使用，并且新建的文件使用了新的 i 节点，与原文件即使同名也没有产生任何联系。</p>
+<h3 id="恢复删除的文件"><a href="#恢复删除的文件" class="headerlink" title="恢复删除的文件"></a>恢复删除的文件</h3><p>当用 cp 命令不加任何选项复制一个符号链接时，复制的是符号链接指向的目标文件。文件描述符 3 指向的内容就是被删除文件的内容，这一内容是可以通过 cp 命令复原的内容的（data 文件）这进一步说明了原 data.txt 的内容没有被删除。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ cp /proc/21594/fd/3 recovery_data</span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ll -ilL recovery_data</span><br><span class="line">1054022 -rw-rw-r-- 1 winter winter 12 Jul 25 22:00 recovery_data</span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ ls -ilL /proc/21594/fd/3 </span><br><span class="line">1054025 -rw-rw-r-- 0 winter winter 12 Jul 25 00:09 /proc/21594/fd/3</span><br></pre></td></tr></table></figure>
+<p>复原只是内容的重新dump，i节点号是新的。</p>
+<h2 id="POC结论"><a href="#POC结论" class="headerlink" title="POC结论"></a>POC结论</h2><p>由此可知，当进程打开一个文件后，如果我们在磁盘上删除这个文件，虽然表面上看在目录中已经成功删除了这个文件名，但是实际上系统依然保留了文件内容，直至所有进程都关闭了这一文件。这种行为与 unlink() 的 man page 描述一致，linux 系统的健壮性可见一斑。所以rm只是删除了文件名，不会因为文件正在被占用而导致rm失败。</p>
+<h2 id="文件系统"><a href="#文件系统" class="headerlink" title="文件系统"></a>文件系统</h2><p>unix文件系统基本结构：<br><img src="https://s3.ax1x.com/2021/01/13/sNNQ5n.png"></p>
+<p>我们可以把一个磁盘分成一个或多个分区。每个分区包含一个文件系统。</p>
+<ul>
+<li><p>超级块：存放文件系统本省的结构信息。比如，每个区域的大小，未使用的磁盘块的信息。总之，它是是一个文件系统的概括。</p>
+</li>
+<li><p>i节点表：每个文件都有一些属性，如文件的大小、文件所有者、和创建时间等，这些性质被记录在一个称为i-节点的结构中。所有i-节点都有相同的大小，并且i-节点表是这些结构的一个列表，文件系统中每个文件在该表中都有一个i-节点。</p>
+</li>
+<li><p>数据块：文件的内容保存在这个区域。磁盘上所有块的大小都一样。如果文件包含了超过一个块的内容，则文件内容会存放在多个块中。一个较大的文件很容易分布上千个独立的块中.<br>接下来，我们详细看下i节点表和数据块。<br><img src="https://s3.ax1x.com/2021/01/13/sNNMUs.png"></p>
+</li>
+<li><p>目录块：是一系列目录项的列表。每个目录项，由两部分构成：文件名以及对应的i节点号。</p>
+</li>
+<li><p>i节点：包含了文件有关的所有信息，文件类型、文件访问权限、长度和指向文件数据块的指针等。通过stat查看到的文件信息大部分取自i节点。</p>
+</li>
+<li><p>数据块：系统通常一次会读取一个数据块的大小（4k,4096bytes）。</p>
+</li>
+</ul>
+<ol>
+<li>stat命令输出的Blocks单位通常是512bytes，也就是一个扇区。</li>
+<li>一个文件假设只有几个字节，其实也会占用一个文件块(Block size)大小，通常是4096bytes。</li>
+<li>系统通常一次会读取一个Block size大小，而不是一个扇区大小。<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/test_delete_file ❯ <span class="built_in">stat</span> data </span><br><span class="line">File: data</span><br><span class="line">Size: 13 Blocks: 8 IO Block: 4096 regular file</span><br><span class="line">Device: 801h/2049d Inode: 1054026 Links: 1</span><br><span class="line">Access: (0664/-rw-rw-r--) Uid: ( 1000/ winter) Gid: ( 1000/ winter)</span><br><span class="line">Access: 2020-07-25 21:48:55.057772045 -0700</span><br><span class="line">Modify: 2020-07-25 21:48:55.057772045 -0700</span><br><span class="line">Change: 2020-07-25 21:48:55.057772045 -0700</span><br><span class="line">Birth: -</span><br></pre></td></tr></table></figure>
+<h3 id="创建文件-amp-目录"><a href="#创建文件-amp-目录" class="headerlink" title="创建文件&amp;目录"></a>创建文件&amp;目录</h3><h4 id="文件"><a href="#文件" class="headerlink" title="文件"></a>文件</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev ❯ touch mk_file.txt</span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev ❯ <span class="built_in">stat</span> mk_file.txt </span><br><span class="line">File: mk_file.txt</span><br><span class="line">Size: 0 Blocks: 0 IO Block: 4096 regular empty file</span><br><span class="line">Device: 801h/2049d Inode: 1054023 Links: 1</span><br><span class="line">Access: (0664/-rw-rw-r--) Uid: ( 1000/ winter) Gid: ( 1000/ winter)</span><br><span class="line">Access: 2020-07-26 01:43:25.589866702 -0700</span><br><span class="line">Modify: 2020-07-26 01:43:25.589866702 -0700</span><br><span class="line">Change: 2020-07-26 01:43:25.589866702 -0700</span><br><span class="line">Birth: -</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p><strong>Links为硬链接。硬链接直接指向文件i节点。link为1来自该文件的目录项。</strong><br><img src="https://s3.ax1x.com/2021/01/13/sNNKEj.png"></p>
+<h4 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h4><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev ❯ mkdir mk_dir</span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev ❯ <span class="built_in">stat</span> mk_dir</span><br><span class="line">File: mk_dir</span><br><span class="line">Size: 4096 Blocks: 8 IO Block: 4096 directory</span><br><span class="line">Device: 801h/2049d Inode: 1090530 Links: 2</span><br><span class="line">Access: (0775/drwxrwxr-x) Uid: ( 1000/ winter) Gid: ( 1000/ winter)</span><br><span class="line">Access: 2020-07-26 01:49:17.297681146 -0700</span><br><span class="line">Modify: 2020-07-26 01:49:17.297681146 -0700</span><br><span class="line">Change: 2020-07-26 01:49:17.297681146 -0700</span><br><span class="line">Birth: -</span><br><span class="line"><span class="comment">###################################</span></span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/mk_dir ❯ mkdir mk_dir2</span><br><span class="line">winter@ubuntu <span class="keyword">in</span> ~/Dev/mk_dir ❯ <span class="built_in">stat</span> mk_dir2</span><br><span class="line">File: mk_dir2</span><br><span class="line">Size: 4096 Blocks: 8 IO Block: 4096 directory</span><br><span class="line">Device: 801h/2049d Inode: 1090531 Links: 2</span><br><span class="line">Access: (0775/drwxrwxr-x) Uid: ( 1000/ winter) Gid: ( 1000/ winter)</span><br><span class="line">Access: 2020-07-26 02:04:19.016754520 -0700</span><br><span class="line">Modify: 2020-07-26 02:04:19.016754520 -0700</span><br><span class="line">Change: 2020-07-26 02:04:19.016754520 -0700</span><br><span class="line">Birth: -</span><br></pre></td></tr></table></figure>
+<p><strong>编号为1090531 ，其类型字段表示它是个目录，链接数为2，任何一个页目录链接数#总是2，数值2来自命名该目录的目录项（1090530）和在该目录项中的‘.’。1090530,链接数为3:一个是命名它的目录项，第二个是该目录项中的‘.’第三个是子目录中的‘..’。</strong><br><img src="https://s3.ax1x.com/2021/01/13/sNN1Cq.png"></p>
+<h2 id="Reference"><a href="#Reference" class="headerlink" title="Reference:"></a>Reference:</h2><p><a href="https://zhuanlan.zhihu.com/p/25650525">https://zhuanlan.zhihu.com/p/25650525</a><br>《UNIX环境高级编程》（第三版）4.14文件系统</p>
+]]></content>
+      <categories>
+        <category>code</category>
+      </categories>
+      <tags>
+        <tag>Linux文件系统</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>海南游</title>
+    <url>/2021/02/26/%E6%B5%B7%E5%8D%97%E6%B8%B8/</url>
+    <content><![CDATA[<!-- TOC -->
+
+<ul>
+<li><a href="#2021%E3%81%AE%E6%98%A5%E8%8A%82">2021の春节</a></li>
+<li><a href="#%E6%B5%B7%E5%8F%A3">海口</a></li>
+<li><a href="#%E4%B8%89%E4%BA%9A">三亚</a></li>
+</ul>
+<!-- /TOC -->
+<span id="more"></span>
+<h2 id="2021の春节"><a href="#2021の春节" class="headerlink" title="2021の春节"></a>2021の春节</h2><p>当我写下这个标题时，下意识的看了下电脑左下角的日期，不是几时几分，是年份。是年年如此相似，让我难以给每一年一个特殊的标签来记忆？还是不得不承认我的记忆力已经加速衰退？突然就想起那么一句话：生活一半回忆，一半继续。年龄越大，越深体会。  </p>
+<p>本来的春节安排是想去拉萨过年，为什么想去，其实原因远远不是什么诗和远方，只是觉得它够远，与我常年待的地方差异化大，以前有过去的想法，那就干脆去吧，如果说有所期待，一是是坐z164横穿中国，感受最美的风景在路上，以及它是佛教圣地，还蛮感兴趣的。</p>
+<p>后来因为疫情加上小谢要回海南过年，我就打消的去拉萨过春节的想法。一个人旅行，我还没有到达这种境界。于是，行程就变成了去海南度假。这是我第一次春节期间出远门旅行，也不会是最后一次。</p>
+<h2 id="海口"><a href="#海口" class="headerlink" title="海口"></a>海口</h2><p>大年初一，没坐过飞机的爸妈带我去飞机场，哈哈，我爸一直充满好奇的看着大大的航站楼，在理解我做的每一个步骤，彷佛为以后的坐飞机坐准备。意料之中的整个航站楼人不多，飞往海口的途中飞机也很平稳，心情大概是飞机再快一点、再快一点。</p>
+<p>到达海口，见到小谢，开心又奇妙。海口冬天的温度好极了，凉爽，路两旁的椰子树、榕树，也格外清爽。整个城市带着夏季海边复古小镇的滤镜。旧旧的建筑、听不懂的方言、凉爽的清晨、铺满海面的落日以及吃不完的各种粉，组成了我对海口的第一印象。</p>
+<p>旅行对我最大的吸引就是，逃离的快感。是的，身体和心理都是，没人认识我，没人关注我，视觉味觉嗅觉触碰到新的细胞，我只需要感受我自己，自己的每一个细胞。我不再是某公司的员工、某家庭的成员。旅行是身体走出去，灵魂回了家。</p>
+<p>骑楼、食品街、陵水酸粉、海南粉、抱罗粉、清补凉、糟粕醋、海边公园…两天时间足以让我觉得海口真的值得冬天来待几天。在海口悠闲的待了两天之后，即2.14号，我们启程去了三亚。</p>
+<h2 id="三亚"><a href="#三亚" class="headerlink" title="三亚"></a>三亚</h2><p>印象中三亚是个国内很多人度蜜月常去的地方，但作为海岛游的话，总觉得不如菲律宾的一些小岛有意思。但是还是满怀着期待去了，出去玩，哪里都是新鲜的体验。在开往三亚的高铁上，窗外是偏热带的风景，是与以往回山东老家或去其他南方完全不一样的景致，其中有一小段开在海边，如果此时带上耳机，放一首旋律轻快的音乐，心情也会变成音符跳跃起来吧。</p>
+<p>到达三亚后是下午，温度比海口要高，我跟小谢便迫不及待的换上岛服，带上太阳镜，就这么靓仔出街了。先去了鹿回头，一座可以俯瞰三亚的小山，还有一个动人的爱情故事，来这边除了看看风景，还有一些网红拍照经典，我并不排斥网红拍照景点，拍出好看的照片也是让人心情好的事情，但是别只顾着从镜头里看风景就好了。</p>
+<p>傍晚去了耶梦长廊附近的海滩走了走，在海边散步的人还蛮多的，虽然落日被太阳遮挡，但是看到大海总是让人心旷神怡，与仰望星空的感觉类似，渺小如我，却如此自执的一个小小人类。跟小谢想拍出那片既视感的海边照片，奈何屡屡失败，两个人哭笑不得，太难了…晚点去了一家预约好的露天海景西餐厅，因为情人节价格也翻倍，布置的倒浪漫，就是海风确实大，有些凉了。我自诩这是我迄今为止最浪漫的情人节，倒也不只是因为在海景餐厅吃晚饭，是天时地利人和的浪漫，哈哈。吃完饭就溜达回了宾馆。</p>
+<p>第二天去了‘亚龙湾森林公园’，买的套票包含一顿中午的自住。整个森林公园分为几个主要的景点，都用游览车接送，在想玩的经典下车就行。恐高选手表示，那个索道还是挺吓人的。《非诚勿扰2》他们的试婚房也在山里，其实这也是我选择这个景点的原因之一，当时看这部电影的时候，开车从山脚开到房间，再到房间，已经房间周围的小地方，真的挺美的，当时还在想这是哪呀，好想去看看，真正到了，其实风景差异不大，就是人一多，整个欣赏的质量就下降了，匆忙急促感增多。下午3点多逛完，背上我的大旅行包，辗转下一个住所—蜈支洲岛码头。</p>
+<p>在蜈支洲岛码头的那个夜晚让我久久难忘。夜晚的街道是夜宵和酒精组成的，我们在一家简单的不能称作酒吧的地方坐了下了，只有几个位子，位子后面是一个小小的汽车作为装饰，和陌生人分享一个小桌子。听着陌生的故事，羡慕着旅居人的勇敢和洒脱，也为能共享海边这样一个夜晚感到幸运。喝完几杯，我们跑到码头上，躺下来看天空，小谢在认真的找北斗七星，我在认真听大海一阵阵的浪声，在黑夜变得神秘和令人有点恐惧。想起在长滩岛的那个夜晚，我们坐在海滩上，一遍遍被涨潮往后移动，我看着眼前的这片海，它来自南太平洋，我的家，我喜欢的人，都在遥不可及的北方，再看看天空的点点星空，彷佛它们是一样的遥远。那种感觉好奇妙，脱离了熟悉的人和环境，我好像什么也不是，面对浩瀚的大海和宇宙，投影下是自己小小的身躯，不由得发散出一个庞大的哲学问题：我是谁？那时候还陷在痛苦的分手祭奠期，心里想的是所爱隔山海，山海终究是不可平啊。如今，我躺在另一片大海旁边，也不会再思考那些遥远的问题，山海虽不可平，可好在人生海海，终能再遇到愿相互陪伴之人。陪伴，还有什么比这个更珍贵呢。<br><a href="https://imgtu.com/i/6doNkV"><img src="https://s3.ax1x.com/2021/03/13/6doNkV.jpg" alt="6doNkV.jpg"></a></p>
+<p><a href="https://imgtu.com/i/6doUYT"><img src="https://s3.ax1x.com/2021/03/13/6doUYT.jpg" alt="6doUYT.jpg"></a></p>
+<p>来到第三天，我们一大早就去了蜈支洲岛，买了海上游玩项目的套票，玩了个够。拖伞、大小飞鱼….期间小谢同学多次被别人夸，说像小仙女，笑起来眼睛弯弯的。对了，之前那个小酒馆的小姑娘，也说小谢笑起来好甜。哈哈哈，其实我也是最喜欢她开心笑的样子，很有感染力，让别人开心到想给她熊抱。</p>
+<p>随着蜈支洲岛游玩结束，海南的旅行也差不多结束了。我们折返回海口，并在小谢的爷爷奶奶家住了一晚，第二天坐上漫长的绿皮火车回南京。期间，经历了火车+轮渡的方式过琼州海峡、小谢的行李箱被拿错…，whatever 我们还是开开心心的回到南京啦。</p>
+<p>我们下段旅行再见……<br><a href="https://imgtu.com/i/6doafU"><img src="https://s3.ax1x.com/2021/03/13/6doafU.jpg" alt="6doafU.jpg"></a></p>
+]]></content>
+      <categories>
+        <category>travel</category>
+      </categories>
+      <tags>
+        <tag>海南</tag>
+        <tag>三亚</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>长滩日出</title>
+    <url>/2021/01/18/%E9%95%BF%E6%BB%A9%E6%97%A5%E5%87%BA/</url>
+    <content><![CDATA[<h4 id="星星和月亮掉进海里"><a href="#星星和月亮掉进海里" class="headerlink" title="星星和月亮掉进海里"></a><center>星星和月亮掉进海里</h4><h4 id="所以太阳升起"><a href="#所以太阳升起" class="headerlink" title="所以太阳升起"></a><center>所以太阳升起</h4><span id="more"></span>
+<p><a href="https://imgchr.com/i/scG5xe"><img src="https://s3.ax1x.com/2021/01/18/scG5xe.jpg" alt="scG5xe.jpg"></a><br><a href="https://imgchr.com/i/scGbVI"><img src="https://s3.ax1x.com/2021/01/18/scGbVI.jpg" alt="scGbVI.jpg"></a></p>
+<h4 id="南太平洋的季风吹过"><a href="#南太平洋的季风吹过" class="headerlink" title="南太平洋的季风吹过"></a><center>南太平洋的季风吹过</h4><h4 id="裹挟着海水的咸腥"><a href="#裹挟着海水的咸腥" class="headerlink" title="裹挟着海水的咸腥"></a><center>裹挟着海水的咸腥</h4><h4 id="宇宙山河不吝啬浪漫"><a href="#宇宙山河不吝啬浪漫" class="headerlink" title="宇宙山河不吝啬浪漫"></a><center>宇宙山河不吝啬浪漫</h4><h4 id="赐我满目温柔"><a href="#赐我满目温柔" class="headerlink" title="赐我满目温柔"></a><center>赐我满目温柔</h4><p><a href="https://imgchr.com/i/scGXPf"><img src="https://s3.ax1x.com/2021/01/18/scGXPf.jpg" alt="scGXPf.jpg"></a></p>
+]]></content>
+      <categories>
+        <category>poem</category>
+      </categories>
+      <tags>
+        <tag>长滩岛</tag>
+        <tag>日出日落</tag>
+      </tags>
+  </entry>
+</search>
