@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="海南,三亚," />
+  <meta name="keywords" content="azure,servicebus," />
 
 
 
@@ -79,23 +79,22 @@
 
 
 
-<meta name="description" content="2021の春节 海口 三亚">
+<meta name="description" content="00 背景 01 servicebus retry 02 root cause and fix   00 背景在使用servicebus的时候发现了一个bug,并得到了fix,看样子是在retry的时候出现了问题，记录如下，顺便学习下它的retry机制：https:&#x2F;&#x2F;github.com&#x2F;Azure&#x2F;azure-sdk-for-js&#x2F;issues&#x2F;15398">
 <meta property="og:type" content="article">
-<meta property="og:title" content="海南游">
-<meta property="og:url" content="http://example.com/2021/02/26/%E6%B5%B7%E5%8D%97%E6%B8%B8/index.html">
+<meta property="og:title" content="分析azure servicebus的一次bug fix">
+<meta property="og:url" content="http://example.com/2021/05/30/%E5%88%86%E6%9E%90azure-servicebus%E7%9A%84%E4%B8%80%E6%AC%A1bug-fix/index.html">
 <meta property="og:site_name" content="Winter&#39;s blog">
-<meta property="og:description" content="2021の春节 海口 三亚">
+<meta property="og:description" content="00 背景 01 servicebus retry 02 root cause and fix   00 背景在使用servicebus的时候发现了一个bug,并得到了fix,看样子是在retry的时候出现了问题，记录如下，顺便学习下它的retry机制：https:&#x2F;&#x2F;github.com&#x2F;Azure&#x2F;azure-sdk-for-js&#x2F;issues&#x2F;15398">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="https://s3.ax1x.com/2021/03/13/6doNkV.jpg">
-<meta property="og:image" content="https://s3.ax1x.com/2021/03/13/6doUYT.jpg">
-<meta property="og:image" content="https://s3.ax1x.com/2021/03/13/6doafU.jpg">
-<meta property="article:published_time" content="2021-02-26T13:21:10.000Z">
-<meta property="article:modified_time" content="2021-05-19T12:35:15.232Z">
+<meta property="og:image" content="https://z3.ax1x.com/2021/05/30/2VTDL8.png">
+<meta property="og:image" content="https://z3.ax1x.com/2021/05/30/2V7pwD.png">
+<meta property="article:published_time" content="2021-05-30T03:15:40.000Z">
+<meta property="article:modified_time" content="2021-05-30T09:42:49.244Z">
 <meta property="article:author" content="winter">
-<meta property="article:tag" content="海南">
-<meta property="article:tag" content="三亚">
+<meta property="article:tag" content="azure">
+<meta property="article:tag" content="servicebus">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://s3.ax1x.com/2021/03/13/6doNkV.jpg">
+<meta name="twitter:image" content="https://z3.ax1x.com/2021/05/30/2VTDL8.png">
 
 
 
@@ -125,13 +124,13 @@
 
 
 
-  <link rel="canonical" href="http://example.com/2021/02/26/海南游/"/>
+  <link rel="canonical" href="http://example.com/2021/05/30/分析azure-servicebus的一次bug-fix/"/>
 
 
 
 
 
-  <title>海南游 | Winter's blog</title>
+  <title>分析azure servicebus的一次bug fix | Winter's blog</title>
   
 
 
@@ -302,7 +301,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2021/02/26/%E6%B5%B7%E5%8D%97%E6%B8%B8/">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/05/30/%E5%88%86%E6%9E%90azure-servicebus%E7%9A%84%E4%B8%80%E6%AC%A1bug-fix/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="">
@@ -319,7 +318,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">海南游</h1>
+          <h1 class="post-title" itemprop="name headline">分析azure servicebus的一次bug fix</h1>
         
 
         <div class="post-meta">
@@ -331,8 +330,8 @@
               
                 <span class="post-meta-item-text">Posted on</span>
               
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2021-02-26T21:21:10+08:00">
-                2021-02-26
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2021-05-30T11:15:40+08:00">
+                2021-05-30
               </time>
             
 
@@ -354,8 +353,8 @@
               
               
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/travel/" itemprop="url" rel="index">
-                    <span itemprop="name">travel</span>
+                  <a href="/categories/code/" itemprop="url" rel="index">
+                    <span itemprop="name">code</span>
                   </a>
                 </span>
 
@@ -394,28 +393,37 @@
         <!-- TOC -->
 
 <ul>
-<li><a href="#2021%E3%81%AE%E6%98%A5%E8%8A%82">2021の春节</a></li>
-<li><a href="#%E6%B5%B7%E5%8F%A3">海口</a></li>
-<li><a href="#%E4%B8%89%E4%BA%9A">三亚</a></li>
+<li><a href="#00-%E8%83%8C%E6%99%AF">00 背景</a></li>
+<li><a href="#01-servicebus-retry">01 servicebus retry</a></li>
+<li><a href="#02-root-cause-and-fix">02 root cause and fix</a></li>
 </ul>
 <!-- /TOC -->
+<h2 id="00-背景"><a href="#00-背景" class="headerlink" title="00 背景"></a>00 背景</h2><p>在使用servicebus的时候发现了一个bug,并得到了fix,看样子是在retry的时候出现了问题，记录如下，顺便学习下它的retry机制：<a target="_blank" rel="noopener" href="https://github.com/Azure/azure-sdk-for-js/issues/15398">https://github.com/Azure/azure-sdk-for-js/issues/15398</a></p>
 <span id="more"></span>
-<h2 id="2021の春节"><a href="#2021の春节" class="headerlink" title="2021の春节"></a>2021の春节</h2><p>当我写下这个标题时，下意识的看了下电脑左下角的日期，不是几时几分，是年份。是年年如此相似，让我难以给每一年一个特殊的标签来记忆？还是不得不承认我的记忆力已经加速衰退？突然就想起那么一句话：生活一半回忆，一半继续。年龄越大，越深体会。  </p>
-<p>本来的春节安排是想去拉萨过年，为什么想去，其实原因远远不是什么诗和远方，只是觉得它够远，与我常年待的地方差异化大，以前有过去的想法，那就干脆去吧，如果说有所期待，一是是坐z164横穿中国，感受最美的风景在路上，以及它是佛教圣地，还蛮感兴趣的。</p>
-<p>后来因为疫情加上小谢要回海南过年，我就打消的去拉萨过春节的想法。一个人旅行，我还没有到达这种境界。于是，行程就变成了去海南度假。这是我第一次春节期间出远门旅行，也不会是最后一次。</p>
-<h2 id="海口"><a href="#海口" class="headerlink" title="海口"></a>海口</h2><p>大年初一，没坐过飞机的爸妈带我去飞机场，哈哈，我爸一直充满好奇的看着大大的航站楼，在理解我做的每一个步骤，彷佛为以后的坐飞机坐准备。意料之中的整个航站楼人不多，飞往海口的途中飞机也很平稳，心情大概是飞机再快一点、再快一点。</p>
-<p>到达海口，见到小谢，开心又奇妙。海口冬天的温度好极了，凉爽，路两旁的椰子树、榕树，也格外清爽。整个城市带着夏季海边复古小镇的滤镜。旧旧的建筑、听不懂的方言、凉爽的清晨、铺满海面的落日以及吃不完的各种粉，组成了我对海口的第一印象。</p>
-<p>旅行对我最大的吸引就是，逃离的快感。是的，身体和心理都是，没人认识我，没人关注我，视觉味觉嗅觉触碰到新的细胞，我只需要感受我自己，自己的每一个细胞。我不再是某公司的员工、某家庭的成员。旅行是身体走出去，灵魂回了家。</p>
-<p>骑楼、食品街、陵水酸粉、海南粉、抱罗粉、清补凉、糟粕醋、海边公园…两天时间足以让我觉得海口真的值得冬天来待几天。在海口悠闲的待了两天之后，即2.14号，我们启程去了三亚。</p>
-<h2 id="三亚"><a href="#三亚" class="headerlink" title="三亚"></a>三亚</h2><p>印象中三亚是个国内很多人度蜜月常去的地方，但作为海岛游的话，总觉得不如菲律宾的一些小岛有意思。但是还是满怀着期待去了，出去玩，哪里都是新鲜的体验。在开往三亚的高铁上，窗外是偏热带的风景，是与以往回山东老家或去其他南方完全不一样的景致，其中有一小段开在海边，如果此时带上耳机，放一首旋律轻快的音乐，心情也会变成音符跳跃起来吧。</p>
-<p>到达三亚后是下午，温度比海口要高，我跟小谢便迫不及待的换上岛服，带上太阳镜，就这么靓仔出街了。先去了鹿回头，一座可以俯瞰三亚的小山，还有一个动人的爱情故事，来这边除了看看风景，还有一些网红拍照经典，我并不排斥网红拍照景点，拍出好看的照片也是让人心情好的事情，但是别只顾着从镜头里看风景就好了。</p>
-<p>傍晚去了耶梦长廊附近的海滩走了走，在海边散步的人还蛮多的，虽然落日被太阳遮挡，但是看到大海总是让人心旷神怡，与仰望星空的感觉类似，渺小如我，却如此自执的一个小小人类。跟小谢想拍出那片既视感的海边照片，奈何屡屡失败，两个人哭笑不得，太难了…晚点去了一家预约好的露天海景西餐厅，因为情人节价格也翻倍，布置的倒浪漫，就是海风确实大，有些凉了。我自诩这是我迄今为止最浪漫的情人节，倒也不只是因为在海景餐厅吃晚饭，是天时地利人和的浪漫，哈哈。吃完饭就溜达回了宾馆。</p>
-<p>第二天去了‘亚龙湾森林公园’，买的套票包含一顿中午的自住。整个森林公园分为几个主要的景点，都用游览车接送，在想玩的经典下车就行。恐高选手表示，那个索道还是挺吓人的。《非诚勿扰2》他们的试婚房也在山里，其实这也是我选择这个景点的原因之一，当时看这部电影的时候，开车从山脚开到房间，再到房间，已经房间周围的小地方，真的挺美的，当时还在想这是哪呀，好想去看看，真正到了，其实风景差异不大，就是人一多，整个欣赏的质量就下降了，匆忙急促感增多。下午3点多逛完，背上我的大旅行包，辗转下一个住所—蜈支洲岛码头。</p>
-<p>在蜈支洲岛码头的那个夜晚让我久久难忘。夜晚的街道是夜宵和酒精组成的，我们在一家简单的不能称作酒吧的地方坐了下了，只有几个位子，位子后面是一个小小的汽车作为装饰，和陌生人分享一个小桌子。听着陌生的故事，羡慕着旅居人的勇敢和洒脱，也为能共享海边这样一个夜晚感到幸运。喝完几杯，我们跑到码头上，躺下来看天空，小谢在认真的找北斗七星，我在认真听大海一阵阵的浪声，在黑夜变得神秘和令人有点恐惧。想起在长滩岛的那个夜晚，我们坐在海滩上，一遍遍被涨潮往后移动，我看着眼前的这片海，它来自南太平洋，我的家，我喜欢的人，都在遥不可及的北方，再看看天空的点点星空，彷佛它们是一样的遥远。那种感觉好奇妙，脱离了熟悉的人和环境，我好像什么也不是，面对浩瀚的大海和宇宙，投影下是自己小小的身躯，不由得发散出一个庞大的哲学问题：我是谁？那时候还陷在痛苦的分手祭奠期，心里想的是所爱隔山海，山海终究是不可平啊。如今，我躺在另一片大海旁边，也不会再思考那些遥远的问题，山海虽不可平，可好在人生海海，终能再遇到愿相互陪伴之人。陪伴，还有什么比这个更珍贵呢。<br><a target="_blank" rel="noopener" href="https://imgtu.com/i/6doNkV"><img src="https://s3.ax1x.com/2021/03/13/6doNkV.jpg" alt="6doNkV.jpg"></a></p>
-<p><a target="_blank" rel="noopener" href="https://imgtu.com/i/6doUYT"><img src="https://s3.ax1x.com/2021/03/13/6doUYT.jpg" alt="6doUYT.jpg"></a></p>
-<p>来到第三天，我们一大早就去了蜈支洲岛，买了海上游玩项目的套票，玩了个够。拖伞、大小飞鱼….期间小谢同学多次被别人夸，说像小仙女，笑起来眼睛弯弯的。对了，之前那个小酒馆的小姑娘，也说小谢笑起来好甜。哈哈哈，其实我也是最喜欢她开心笑的样子，很有感染力，让别人开心到想给她熊抱。</p>
-<p>随着蜈支洲岛游玩结束，海南的旅行也差不多结束了。我们折返回海口，并在小谢的爷爷奶奶家住了一晚，第二天坐上漫长的绿皮火车回南京。期间，经历了火车+轮渡的方式过琼州海峡、小谢的行李箱被拿错…，whatever 我们还是开开心心的回到南京啦。</p>
-<p>我们下段旅行再见……<br><a target="_blank" rel="noopener" href="https://imgtu.com/i/6doafU"><img src="https://s3.ax1x.com/2021/03/13/6doafU.jpg" alt="6doafU.jpg"></a></p>
+<h2 id="01-servicebus-retry"><a href="#01-servicebus-retry" class="headerlink" title="01 servicebus retry"></a>01 servicebus retry</h2><p>在create servicebus的时候带一个retry的policy,之后在这个client上的操作都自带了retry,对于service bus中产生的error都会包装成messsage error,而message error又分为可重试的和不可重试的。</p>
+<p><strong>retryableErrors定义如下：</strong></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Provides a list of retryable AMQP errors.</span></span><br><span class="line"><span class="comment"> * &quot;InternalServerError&quot;, &quot;ServerBusyError&quot;, &quot;ServiceUnavailableError&quot;, &quot;OperationCancelledError&quot;,</span></span><br><span class="line"><span class="comment"> * &quot;SenderBusyError&quot;, &quot;MessagingError&quot;, &quot;DetachForcedError&quot;, &quot;ConnectionForcedError&quot;,</span></span><br><span class="line"><span class="comment"> * &quot;TransferLimitExceededError&quot;</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> retryableErrors = [</span><br><span class="line">    <span class="string">&quot;InternalServerError&quot;</span>,</span><br><span class="line">    <span class="string">&quot;ServerBusyError&quot;</span>,</span><br><span class="line">    <span class="string">&quot;ServiceUnavailableError&quot;</span>,</span><br><span class="line">    <span class="string">&quot;OperationCancelledError&quot;</span>,</span><br><span class="line">    <span class="comment">// The service may throw UnauthorizedError if credentials have been rotated.</span></span><br><span class="line">    <span class="comment">// Attempt to retry in case the user has also rotated their credentials.</span></span><br><span class="line">    <span class="string">&quot;UnauthorizedError&quot;</span>,</span><br><span class="line">    <span class="comment">// OperationTimeoutError occurs when the service fails to respond within a given timeframe.</span></span><br><span class="line">    <span class="comment">// Since reasons for such failures can be transient, this is treated as a retryable error.</span></span><br><span class="line">    <span class="string">&quot;OperationTimeoutError&quot;</span>,</span><br><span class="line">    <span class="string">&quot;SenderBusyError&quot;</span>,</span><br><span class="line">    <span class="string">&quot;MessagingError&quot;</span>,</span><br><span class="line">    <span class="string">&quot;DetachForcedError&quot;</span>,</span><br><span class="line">    <span class="string">&quot;ConnectionForcedError&quot;</span>,</span><br><span class="line">    <span class="string">&quot;TransferLimitExceededError&quot;</span>,</span><br><span class="line">    <span class="comment">// InsufficientCreditError occurs when the number of credits available on Rhea link is insufficient.</span></span><br><span class="line">    <span class="comment">// Since reasons for such shortage can be transient such as for pending delivery of messages, this is treated as a retryable error.</span></span><br><span class="line">    <span class="string">&quot;InsufficientCreditError&quot;</span></span><br><span class="line">];</span><br></pre></td></tr></table></figure>
+<p>*<em>retry code</em></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Every operation is attempted at least once. Additional attempts are made if the previous attempt failed</span></span><br><span class="line"><span class="comment"> * with a retryable error. The number of additional attempts is governed by the `maxRetries` property provided</span></span><br><span class="line"><span class="comment"> * on the `RetryConfig` argument.</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * If `mode` option is set to `Fixed`, then the retries are made on the</span></span><br><span class="line"><span class="comment"> * given operation for a specified number of times, with a fixed delay in between each retry each time.</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * If `mode` option is set to `Exponential`, then the delay between retries is adjusted to increase</span></span><br><span class="line"><span class="comment"> * exponentially with each attempt using back-off factor of power 2.</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@param <span class="variable">config</span></span> - Parameters to configure retry operation</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@returns </span>Promise&lt;T&gt;.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">export</span> <span class="function"><span class="keyword">function</span> <span class="title">retry</span>(<span class="params">config</span>) </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> __awaiter(<span class="built_in">this</span>, <span class="keyword">void</span> <span class="number">0</span>, <span class="keyword">void</span> <span class="number">0</span>, <span class="function"><span class="keyword">function</span>* (<span class="params"></span>) </span>&#123;</span><br><span class="line">        validateRetryConfig(config);</span><br><span class="line">        <span class="keyword">if</span> (!config.retryOptions) &#123;</span><br><span class="line">            config.retryOptions = &#123;&#125;;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (config.retryOptions.maxRetries == <span class="literal">undefined</span> || config.retryOptions.maxRetries &lt; <span class="number">0</span>) &#123;</span><br><span class="line">            config.retryOptions.maxRetries = Constants.defaultMaxRetries;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (config.retryOptions.retryDelayInMs == <span class="literal">undefined</span> || config.retryOptions.retryDelayInMs &lt; <span class="number">0</span>) &#123;</span><br><span class="line">            config.retryOptions.retryDelayInMs = Constants.defaultDelayBetweenOperationRetriesInMs;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (config.retryOptions.maxRetryDelayInMs == <span class="literal">undefined</span> ||</span><br><span class="line">            config.retryOptions.maxRetryDelayInMs &lt; <span class="number">0</span>) &#123;</span><br><span class="line">            config.retryOptions.maxRetryDelayInMs = Constants.defaultMaxDelayForExponentialRetryInMs;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (config.retryOptions.mode == <span class="literal">undefined</span>) &#123;</span><br><span class="line">            config.retryOptions.mode = RetryMode.Fixed;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">let</span> lastError;</span><br><span class="line">        <span class="keyword">let</span> result;</span><br><span class="line">        <span class="keyword">let</span> success = <span class="literal">false</span>;</span><br><span class="line">        <span class="keyword">const</span> totalNumberOfAttempts = config.retryOptions.maxRetries + <span class="number">1</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">let</span> i = <span class="number">1</span>; i &lt;= totalNumberOfAttempts; i++) &#123;</span><br><span class="line">            logger.verbose(<span class="string">&quot;[%s] Attempt number for &#x27;%s&#x27;: %d.&quot;</span>, config.connectionId, config.operationType, i);</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                result = <span class="keyword">yield</span> config.operation();</span><br><span class="line">                success = <span class="literal">true</span>;</span><br><span class="line">                logger.verbose(<span class="string">&quot;[%s] Success for &#x27;%s&#x27;, after attempt number: %d.&quot;</span>, config.connectionId, config.operationType, i);</span><br><span class="line">                <span class="keyword">if</span> (result &amp;&amp; !isDelivery(result)) &#123;</span><br><span class="line">                    logger.verbose(<span class="string">&quot;[%s] Success result for &#x27;%s&#x27;: %O&quot;</span>, config.connectionId, config.operationType, result);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">catch</span> (_err) &#123;</span><br><span class="line">                <span class="keyword">let</span> err = _err;</span><br><span class="line">                <span class="keyword">if</span> (!err.translated) &#123;</span><br><span class="line">                    err = translate(err);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">if</span> (!err.retryable &amp;&amp; err.name === <span class="string">&quot;ServiceCommunicationError&quot;</span> &amp;&amp; config.connectionHost) &#123;</span><br><span class="line">                    <span class="keyword">const</span> isConnected = <span class="keyword">yield</span> checkNetworkConnection(config.connectionHost);</span><br><span class="line">                    <span class="keyword">if</span> (!isConnected) &#123;</span><br><span class="line">                        err.name = <span class="string">&quot;ConnectionLostError&quot;</span>;</span><br><span class="line">                        err.retryable = <span class="literal">true</span>;</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">                lastError = err;</span><br><span class="line">                logger.verbose(<span class="string">&quot;[%s] Error occurred for &#x27;%s&#x27; in attempt number %d: %O&quot;</span>, config.connectionId, config.operationType, i, err);</span><br><span class="line">                <span class="keyword">let</span> targetDelayInMs = config.retryOptions.retryDelayInMs;</span><br><span class="line">                <span class="keyword">if</span> (config.retryOptions.mode === RetryMode.Exponential) &#123;</span><br><span class="line">                    <span class="keyword">let</span> incrementDelta = <span class="built_in">Math</span>.pow(<span class="number">2</span>, i) - <span class="number">1</span>;</span><br><span class="line">                    <span class="keyword">const</span> boundedRandDelta = config.retryOptions.retryDelayInMs * <span class="number">0.8</span> +</span><br><span class="line">                        <span class="built_in">Math</span>.floor(<span class="built_in">Math</span>.random() *</span><br><span class="line">                            (config.retryOptions.retryDelayInMs * <span class="number">1.2</span> - config.retryOptions.retryDelayInMs * <span class="number">0.8</span>));</span><br><span class="line">                    incrementDelta *= boundedRandDelta;</span><br><span class="line">                    targetDelayInMs = <span class="built_in">Math</span>.min(incrementDelta, config.retryOptions.maxRetryDelayInMs);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">if</span> (lastError &amp;&amp; lastError.retryable &amp;&amp; totalNumberOfAttempts &gt; i) &#123;</span><br><span class="line">                    logger.verbose(<span class="string">&quot;[%s] Sleeping for %d milliseconds for &#x27;%s&#x27;.&quot;</span>, config.connectionId, targetDelayInMs, config.operationType);</span><br><span class="line">                    <span class="keyword">yield</span> delay(targetDelayInMs, config.abortSignal, <span class="string">`The retry operation has been cancelled by the user.`</span>);</span><br><span class="line">                    <span class="keyword">continue</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">else</span> &#123;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (success) &#123;</span><br><span class="line">            <span class="keyword">return</span> result;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">throw</span> lastError;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>retry的逻辑是:</strong></p>
+<ol>
+<li>检查retry config,retry config包括retry policy和要retry的command</li>
+<li>根据retry 的policy来重试command</li>
+<li>在重试的过程中成功，返回result</li>
+<li>重试过程中抛出异常：<ul>
+<li>先将异常（amqp/system）转成MessagingError</li>
+<li>判断该异常是否retryable:<ul>
+<li>retryable: continue retry loop</li>
+<li>unretryable:break retry loop and thew this exception end the retry</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>在retry policy结束时还没有成功，break retry loop and thew the last exception end the retry</li>
+</ol>
+<h2 id="02-root-cause-and-fix"><a href="#02-root-cause-and-fix" class="headerlink" title="02 root cause and fix"></a>02 root cause and fix</h2><p>那调用getMaxMessageSize什么会造成TypeError: Cannot read property ‘maxMessageSize’ of undefined 呢？<br>他的解释是，在一种极端情况下如果刚成功open sender link,而这个时机发生在红框的两步之间，那么this.link就是undefined。<br><a target="_blank" rel="noopener" href="https://imgtu.com/i/2VTDL8"><img src="https://z3.ax1x.com/2021/05/30/2VTDL8.png" alt="2VTDL8.png"></a></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Initializes the sender session on the connection.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="title">open</span>(<span class="params">options, abortSignal</span>)</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> __awaiter(<span class="built_in">this</span>, <span class="keyword">void</span> <span class="number">0</span>, <span class="keyword">void</span> <span class="number">0</span>, <span class="function"><span class="keyword">function</span>* (<span class="params"></span>) </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="keyword">if</span> (!options) &#123;</span><br><span class="line">                options = <span class="built_in">this</span>._createSenderOptions(Constants.defaultOperationTimeoutInMs);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">yield</span> <span class="built_in">this</span>.initLink(options, abortSignal);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">catch</span> (err) &#123;</span><br><span class="line">            <span class="keyword">const</span> translatedError = translateServiceBusError(err);</span><br><span class="line">            logger.logError(translatedError, <span class="string">`<span class="subst">$&#123;<span class="built_in">this</span>.logPrefix&#125;</span> An error occurred while creating the sender`</span>);</span><br><span class="line">            <span class="comment">// Fix the unhelpful error messages for the OperationTimeoutError that comes from `rhea-promise`.</span></span><br><span class="line">            <span class="keyword">if</span> (translatedError.code === <span class="string">&quot;OperationTimeoutError&quot;</span>) &#123;</span><br><span class="line">                translatedError.message =</span><br><span class="line">                    <span class="string">&quot;Failed to create a sender within allocated time and retry attempts.&quot;</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">throw</span> translatedError;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>而fix的方式也很简单，就是将可能会导致异常的操作，全都包在retry option 的command function里参与retry。<br><a target="_blank" rel="noopener" href="https://imgtu.com/i/2V7pwD"><img src="https://z3.ax1x.com/2021/05/30/2V7pwD.png" alt="2V7pwD.png"></a></p>
 
       
     </div>
@@ -433,9 +441,9 @@
       
         <div class="post-tags">
           
-            <a href="/tags/%E6%B5%B7%E5%8D%97/" rel="tag"># 海南</a>
+            <a href="/tags/azure/" rel="tag"># azure</a>
           
-            <a href="/tags/%E4%B8%89%E4%BA%9A/" rel="tag"># 三亚</a>
+            <a href="/tags/servicebus/" rel="tag"># servicebus</a>
           
         </div>
       
@@ -448,8 +456,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2021/01/23/%E4%B9%A6%E4%B8%AD%E7%A2%8E%E8%AF%AD/" rel="next" title="书中碎语">
-                <i class="fa fa-chevron-left"></i> 书中碎语
+              <a href="/2021/05/19/%E9%93%B2%E5%B1%8E%E5%AE%98%E7%9A%84%E6%97%A5%E5%B8%B8/" rel="next" title="铲屎官心得">
+                <i class="fa fa-chevron-left"></i> 铲屎官心得
               </a>
             
           </div>
@@ -457,10 +465,6 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2021/05/19/%E9%93%B2%E5%B1%8E%E5%AE%98%E7%9A%84%E6%97%A5%E5%B8%B8/" rel="prev" title="铲屎官心得">
-                铲屎官心得 <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -612,7 +616,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#2021%E3%81%AE%E6%98%A5%E8%8A%82"><span class="nav-number">1.</span> <span class="nav-text">2021の春节</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B5%B7%E5%8F%A3"><span class="nav-number">2.</span> <span class="nav-text">海口</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E4%BA%9A"><span class="nav-number">3.</span> <span class="nav-text">三亚</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#00-%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">00 背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#01-servicebus-retry"><span class="nav-number">2.</span> <span class="nav-text">01 servicebus retry</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#02-root-cause-and-fix"><span class="nav-number">3.</span> <span class="nav-text">02 root cause and fix</span></a></li></ol></div>
             
 
           </div>
