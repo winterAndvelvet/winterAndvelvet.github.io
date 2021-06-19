@@ -1,6 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>docker中的僵尸进程</title>
+    <url>/docker%E4%B8%AD%E7%9A%84%E5%83%B5%E5%B0%B8%E8%BF%9B%E7%A8%8B/</url>
+    <content><![CDATA[<!-- TOC -->
+
+<ul>
+<li><a href="#%E8%83%8C%E6%99%AF">背景：</a></li>
+<li><a href="#%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5">基本概念</a></li>
+<li><a href="#docker%E4%B8%AD%E7%9A%84%E4%B8%8D%E5%90%8C">docker中的不同</a></li>
+<li><a href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95">解决方法</a><ul>
+<li><a href="#%E5%8F%82%E8%80%83">参考</a></li>
+</ul>
+</li>
+</ul>
+<!-- /TOC -->
+
+<h2 id="背景："><a href="#背景：" class="headerlink" title="背景："></a>背景：</h2><p>在项目中使用的是微服务架构，各component通过restful api的协议进行通信。各component跑在docker contanier中，其中一个component的功能是使用puppeteer来跑各种html文件，puppeteer可以理解为提供了一系列的api通过无界面的方式来控制chromium，是一个nodejs库。由于在这个component中会有较多的进程创建和crash，所以发现该docker container中存在大量僵尸进程。故总结了一下原因和解决办法。</p>
+<span id="more"></span>
+<h2 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h2><ul>
+<li><p>僵尸进程（z）：子进程的一种状态—–子进程退出，但是父进程没有调用wait/waitpid获取子进程的状态信息，于是子进程的进程描述符仍然保留在系统中。</p>
+</li>
+<li><p>孤儿进程：子进程的一种状态—–父进程先于子进程退出。</p>
+</li>
+<li><p>PID=1的init进程：在自举过程结束后由内核调用的。孤儿进程会被init进程接管，成为所有孤儿进程的父进程。被init进程接管的孤儿进程会不会成为僵尸进程？不会！因为init被编写为无论如何时只要有一个子进程终止，init就会调用wait函数获取其最终状态。</p>
+</li>
+<li><p>僵尸进程的危害：在每个进程结束后，内核会释放该进程所有的资源（文件、内存等），但是仍保留一定的信息（进程号、退出状态、cpu时间等），这一部分信息要等父进程调用wait/waitpid才会释放，如果不被释放，其进程号一直占用，而系统能产生的进程号是有限的，如果有大量的僵尸进程，可能导致系统无法产生新的进程。僵尸进程为死掉的进程，所以不能再接收任何信号，kill也无法杀死。一个可选的解决方法是，杀死父进程（需要谨慎……），于是僵尸进程成为”孤儿进程”，它由给1号进程init收养，init 进程会周期性地去调用 wait 系统调用来清除它的僵尸孩子。</p>
+</li>
+</ul>
+<h2 id="docker中的不同"><a href="#docker中的不同" class="headerlink" title="docker中的不同"></a>docker中的不同</h2><p>Docker: 在docker中没有init进程，pid=1的进程为容器的主进程（npm/node.js……）</p>
+<blockquote>
+<p>Turns out that NodeJS is not able to receive signals and handle them appropriately (if it runs as PID 1). By signals, I mean kernel signals like SIGTERM, SIGINT, etc.<br>The following code wouldn’t work at all if you run NodeJS as PID 1:</p>
+<p><strong>process.on(‘SIGTERM’, function onSigterm()<br>{<br>process.exit(0);</strong>  //do the cleaning job, but it wouldn’t<br><strong>}</strong>);</p>
+<p>As a result, you will get a zombie process which will be terminated forcefully via SIGKILL signal, meaning, that your “clean up” code will not be called at all.</p>
+</blockquote>
+<p><strong>也就是说nodjs进程在pid不等于1的时候是可以handle 退出信号的。但是pid=1的情况下就不可以了。</strong></p>
+<p><strong>So,What is Special With Pid 1?</strong></p>
+<blockquote>
+<p>The process with PID 1 differs from the other processes in the following ways:<br>    1. When the process with pid 1 die for any reason, all other processes are killed with KILL signal<br>    2. When any process having children dies for any reason, its children are reparented to process with PID 1<br>    3. Many signals which have default action of Term do not have one for PID 1.<br> In practice the most inconvenient one is the last one. For development purposes it effectively means you can’t stop process by sending SIGTERM or SIGINT, if process have not installed a signal handler.<br>At the end of the day, all above means most processes that were not explicitly designed to run as PID 1 (which are all applications except supervisors), do not run well. </p>
+</blockquote>
+<h2 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h2><p>dumb-init<br>使用dumb-init 作为初始进程，确保所有子进程都由dumb-init 进程创建。写到dockfile中：apt-get install -y dumb-init=1.2.2-1.1</p>
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="https://www.elastic.io/nodejs-as-pid-1-under-docker-images">https://www.elastic.io/nodejs-as-pid-1-under-docker-images</a><br><a href="https://vagga.readthedocs.io/en/latest/pid1mode.html">https://vagga.readthedocs.io/en/latest/pid1mode.html</a></p>
+]]></content>
+      <categories>
+        <category>code</category>
+      </categories>
+      <tags>
+        <tag>docker</tag>
+        <tag>僵尸进程</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Error Handling in Nodejs</title>
+    <url>/Error-Handling-in-Nodejs/</url>
+    <content><![CDATA[<!-- TOC -->
+
+<ul>
+<li><a href="#%E8%83%8C%E6%99%AF">背景</a></li>
+<li><a href="#nodejs%E4%B8%AD%E5%BC%82%E5%B8%B8%E6%8A%9B%E5%87%BA%E5%92%8C%E5%A4%84%E7%90%86%E7%9A%845%E7%A7%8D%E6%96%B9%E5%BC%8F">nodejs中异常抛出和处理的5种方式</a></li>
+<li><a href="#%E5%BC%82%E5%B8%B8%E7%9A%842%E5%A4%A7%E5%88%86%E7%B1%BB%E5%92%8C%E5%A4%84%E7%90%86%E7%AD%96%E7%95%A5">异常的2大分类和处理策略</a><ul>
+<li><a href="#%E6%93%8D%E4%BD%9C%E5%A4%B1%E8%B4%A5">操作失败</a></li>
+<li><a href="#%E7%A8%8B%E5%BA%8F%E5%91%98%E5%A4%B1%E8%AF%AF">程序员失误</a></li>
+<li><a href="#%E5%A4%84%E7%90%86%E5%A4%B1%E8%B4%A5">处理失败</a></li>
+</ul>
+</li>
+<li><a href="#%E4%BD%95%E6%97%B6%E4%BB%A5%E4%BB%80%E4%B9%88%E6%96%B9%E5%BC%8F%E6%8A%9B%E5%87%BA%E5%BC%82%E5%B8%B8throw-callback-%E8%BF%98%E6%98%AF-eventemitter">何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）</a></li>
+<li><a href="#%E7%BC%96%E5%86%99%E5%87%BD%E6%95%B0%E6%97%B6%E7%9A%84%E5%BB%BA%E8%AE%AE">编写函数时的建议</a></li>
+<li><a href="#reference">Reference</a></li>
+</ul>
+<!-- /TOC -->
+<span id="more"></span>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>Nodejs是单线程,这会导致如果exception没有合适的处理，会导致整个程序的退出。所以要谨慎处理exception。以及区分不同的异常和何时使用哪种异常抛出方式。</p>
+<hr>
+<h2 id="nodejs中异常抛出和处理的5种方式"><a href="#nodejs中异常抛出和处理的5种方式" class="headerlink" title="nodejs中异常抛出和处理的5种方式"></a>nodejs中异常抛出和处理的5种方式</h2><ol>
+<li>Throw the error as exception<br>这是最熟悉的一种异常方式，跟其他的编程语言时类似的。这类异常如果没有被处理，会导致程序的退出。 <figure class="highlight csharp"><table><tr><td class="code"><pre><span class="line"><span class="function">function <span class="title">calculateSquare</span>(<span class="params">number, callback</span>)</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>) &#123;</span><br><span class="line"><span class="keyword">throw</span> <span class="keyword">new</span> Error(<span class="string">&quot;Argument of type number is expected.&quot;</span>));</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">return</span> number * number;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>Pass the error to a callback<br>callback是处理异步操作的返回结果的。把错误传给一个callback，这个函数正是为了处理异常和处理异步操作返回结果的。 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number, callback</span>) </span>&#123;</span><br><span class="line"><span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>) &#123;</span><br><span class="line">callback(<span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">&quot;Argument of type number is expected.&quot;</span>));</span><br><span class="line"><span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">callback(<span class="literal">null</span>, result);</span><br><span class="line">&#125;, <span class="number">1000</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">let</span> callback = <span class="function">(<span class="params">error, result</span>) =&gt;</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (error !== <span class="literal">null</span>) &#123;</span><br><span class="line"><span class="built_in">console</span>.log(<span class="string">&quot;Caught error: &quot;</span> + <span class="built_in">String</span>(error));</span><br><span class="line"><span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="built_in">console</span>.log(result);</span><br><span class="line">&#125;;</span><br><span class="line">calculateSquare(<span class="string">&#x27;s&#x27;</span>, callback);</span><br></pre></td></tr></table></figure></li>
+<li>Pass the error to a reject Promise function(ES6出现了Promise)<br>Promise中reject返回的内容可以被catch拿到，resolve返回的内容可以被then拿到 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number</span>) </span>&#123;</span><br><span class="line"><span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve,reject</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>)&#123;</span><br><span class="line">reject(<span class="string">&#x27;Argument of type number is expected&#x27;</span>)</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">resolve(result)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)</span><br><span class="line">&#125;</span><br><span class="line">calculateSquare(<span class="number">2</span>).</span><br><span class="line">then(<span class="function"><span class="params">res</span>=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(res);</span><br><span class="line">&#125;).</span><br><span class="line"><span class="keyword">catch</span>(<span class="function"><span class="params">error</span>=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(error);</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure></li>
+<li>Emit an error event on an EventEmitter<br>通过EventEmitter可以定义自己的事件，事件触发和事件监听。当EventEmitter（事件）内发生错误时，典型的操作是发出error事件，如果该事件没有监听error事件，那么当error事件被发射时，node进程将退出。为了防止node进程退出，应该为error事件添加监听器。 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="keyword">const</span> emitter = <span class="built_in">require</span>(<span class="string">&#x27;events&#x27;</span>)</span><br><span class="line"><span class="keyword">const</span> myEmitter = <span class="keyword">new</span> emitter();</span><br><span class="line">myEmitter.on(<span class="string">&#x27;error&#x27;</span>,<span class="function">(<span class="params">err</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(<span class="string">&#x27;whoops! there was an error&#x27;</span>)</span><br><span class="line">&#125;)</span><br><span class="line">myEmitter.emit(<span class="string">&#x27;error&#x27;</span>,<span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">&#x27;whoops&#x27;</span>));</span><br><span class="line"><span class="comment">//通过发射error而抛出的异常必须通过监听error事件捕获或</span></span><br><span class="line"><span class="comment">//process.on(&#x27;uncaughtException&#x27;, (err)，try catch则不行。</span></span><br></pre></td></tr></table></figure></li>
+<li>Async/Await(ES7)<br>可以通过catch同步代码的方式catch异步代码了，不需要写then。Resolve的参数就是返回值，reject的参数就是catch里的error. <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number</span>) </span>&#123;</span><br><span class="line"><span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve,reject</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>)&#123;</span><br><span class="line">reject(<span class="string">&#x27;Argument of type number is expected&#x27;</span>)</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">resolve(result)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)</span><br><span class="line">&#125;</span><br><span class="line">(<span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">test</span>(<span class="params"></span>)</span>&#123;</span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line"><span class="keyword">let</span> res = <span class="keyword">await</span> calculateSquare(<span class="string">&#x27;s&#x27;</span>);</span><br><span class="line"><span class="built_in">console</span>.log(res);</span><br><span class="line">&#125; <span class="keyword">catch</span> (error) &#123;</span><br><span class="line"><span class="built_in">console</span>.log(error)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)()</span><br></pre></td></tr></table></figure></li>
+</ol>
+<hr>
+<h2 id="异常的2大分类和处理策略"><a href="#异常的2大分类和处理策略" class="headerlink" title="异常的2大分类和处理策略"></a>异常的2大分类和处理策略</h2><h3 id="操作失败"><a href="#操作失败" class="headerlink" title="操作失败"></a>操作失败</h3><p>不是程序的bug,是系统本身（oom…）,网络问题，远程服务（5xx，ECONNREFUSED…）</p>
+<ul>
+<li>连接不到服务器</li>
+<li>无法解析主机名</li>
+<li>无效的用户输入</li>
+<li>请求超时</li>
+<li>服务器返回500</li>
+<li>套接字被挂起</li>
+<li>系统内存不足<h3 id="程序员失误"><a href="#程序员失误" class="headerlink" title="程序员失误"></a>程序员失误</h3>是程序里的Bug。这些错误往往可以通过修改代码避免。它们永远都没法被有效的处理。</li>
+<li>读取 undefined 的一个属性</li>
+<li>调用异步函数没有指定回调</li>
+<li>该传对象的时候传了一个字符串</li>
+<li>该传IP地址的时候传了一个对象<h3 id="处理失败"><a href="#处理失败" class="headerlink" title="处理失败"></a>处理失败</h3></li>
+<li>直接处理<br>  有的时候该做什么很清楚。如果你在尝试打开日志文件的时候得到了一个ENOENT错误，很有可能你是第一次打开这个文件，你要做的就是首先创建它。更有意思的例子是，你维护着到服务器（比如数据库）的持久连接，然后遇到了一个“socket hang-up”的异常。这通常意味着要么远端要么本地的网络失败了。很多时候这种错误是暂时的，所以大部分情况下你得重新连接来解决问题。（这和接下来的重试不大一样，因为在你得到这个错误的时候已经不必要重试了）</li>
+<li>把出错扩散到客户端<br> 如果你不知道怎么处理这个异常，最简单的方式就是放弃你正在执行的操作，清理所有开始的，然后把错误传递给客户端。（怎么传递异常是另外一回事了，接下来会讨论）。这种方式适合错误短时间内无法解决的情形。比如，用户提交了不正确的JSON，你再解析一次是没什么帮助的。</li>
+<li>重试操作<br>  对于那些来自网络和远程服务的错误，有的时候重试操作就可以解决问题。比如，远程服务返回了503（服务不可用错误），你可能会在几秒种后重试。如果确定要重试，你应该清晰的用文档记录下将会多次重试，重试多少次直到失败,以及两次重试的间隔。 另外，不要每次都假设需要重试。如果在栈中很深的地方（比如，被一个客户端调用，而那个客户端被另外一个由用户操作的客户端控制），这种情形下快速失败让客户端去重试会更好。如果栈中的每一层都觉得需要重试，用户最终会等待更长的时间，因为每一层都没有意识到下层同时也在尝试。</li>
+<li>直接崩溃<br>  对于那些本不可能发生的错误，或者由程序员失误导致的错误（比如无法连接到同一程序里的本地套接字），可以记录一个错误日志然后直接崩溃。其它的比如内存不足这种错误，是JavaScript这样的脚本语言无法处理的，崩溃是十分合理的。（即便如此，在child_process.exec这样的分离的操作里，得到ENOMEM错误，或者那些你可以合理处理的错误时，你应该考虑这么做）。在你无计可施需要让管理员做修复的时候，你也可以直接崩溃。如果你用光了所有的文件描述符或者没有访问配置文件的权限，这种情况下你什么都做不了，只能等某个用户登录系统把东西修好。</li>
+<li>记录错误，其他什么都不做<br>  有的时候你什么都做不了，没有操作可以重试或者放弃，没有任何理由崩溃掉应用程序。举个例子吧，你用DNS跟踪了一组远程服务，结果有一个DNS失败了。除了记录一条日志并且继续使用剩下的服务以外，你什么都做不了。但是，你至少得记录点什么（凡事都有例外。如果这种情况每秒发生几千次，而你又没法处理，那每次发生都记录可能就不值得了，但是要周期性的记录）。</li>
+<li>立刻崩溃,重启<br>  崩溃是失误来临时最快的恢复可靠服务的方法。奔溃应用程序唯一的负面影响是相连的客户端临时被扰乱。在一个完备的分布式系统里，客户端必须能够通过重连和重试来处理服务端的错误。不管 NodeJS 应用程序是否被允许崩溃，网络和系统的失败已经是一个事实了。</li>
+</ul>
+<hr>
+<h2 id="何时以什么方式抛出异常（Throw，-Callback-还是-EventEmitter）"><a href="#何时以什么方式抛出异常（Throw，-Callback-还是-EventEmitter）" class="headerlink" title="何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）"></a>何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）</h2><ul>
+<li>throw以同步的方式传递异常–也就是在函数被调用处的相同的上下文。如果调用者（或者调用者的调用者）用了try/catch，则异常可以捕获。如果所有的调用者都没有用，那么程序通常情况下会崩溃（异常也可能会被进程级的uncaughtException）。</li>
+<li>Callback 是最基础的异步传递事件的一种方式。用户传进来一个函数（callback），之后当某个异步操作完成后调用这个 callback。通常 callback 会以callback(err,result)的形式被调用，这种情况下， err和 result必然有一个是非空的，取决于操作是成功还是失败。</li>
+<li>更复杂的情形是，函数没有用 Callback 而是返回一个 EventEmitter 对象，调用者需要监听这个对象的 error事件。这种方式在两种情况下很有用。</li>
+<li>当你在做一个可能会产生多个错误或多个结果的复杂操作的时候。比如，有一个请求一边从数据库取数据一边把数据发送回客户端，而不是等待所有的结果一起到达。在这个例子里，没有用 callback，而是返回了一个 EventEmitter，每个结果会触发一个row 事件，当所有结果发送完毕后会触发end事件，出现错误时会触发一个error事件。</li>
+<li>用在那些具有复杂状态机的对象上，这些对象往往伴随着大量的异步事件。例如，一个套接字是一个EventEmitter，它可能会触发“connect“，”end“，”timeout“，”drain“，”close“事件。这样，很自然地可以把”error“作为另外一种可以被触发的事件。在这种情况下，清楚知道”error“还有其它事件何时被触发很重要，同时被触发的还有什么事件（例如”close“），触发的顺序，还有套接字是否在结束的时候处于关闭状态。</li>
+<li>callback和EventEmitter通常2选1。</li>
+</ul>
+<hr>
+<h2 id="编写函数时的建议"><a href="#编写函数时的建议" class="headerlink" title="编写函数时的建议"></a>编写函数时的建议</h2><p>清楚的知道函数是做什么的，预期参数—参数的类型—参数的额外约束—返回值—<br>还要知道：调用者可能会遇到的操作失败，怎么处理这个失败（抛出，传递给callback，emitter）。<br>使用ERROR对象或它的子类，并且实现 Error 的协议<br>所有错误要么使用 Error 类要么使用它的子类。你应该提供name和message属性。建议在捕获一些比较底层的异常时封装一层，将原始的error转换成自己的error类，方便调用者理解和处理。</p>
+<hr>
+<h2 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h2><p><a href="https://www.joyent.com/node-js/production/design/errors">https://www.joyent.com/node-js/production/design/errors</a><br><a href="https://code.oneapm.com/nodejs/2015/04/13/nodejs-errorhandling/">https://code.oneapm.com/nodejs/2015/04/13/nodejs-errorhandling/</a></p>
+]]></content>
+      <categories>
+        <category>code</category>
+      </categories>
+      <tags>
+        <tag>nodejs</tag>
+        <tag>error-handler</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>《图解密码技术》笔记</title>
     <url>/%E3%80%8A%E5%9B%BE%E8%A7%A3%E5%AF%86%E7%A0%81%E6%8A%80%E6%9C%AF%E3%80%8B%E7%AC%94%E8%AE%B0/</url>
     <content><![CDATA[<!-- TOC -->
@@ -123,78 +245,6 @@
       </tags>
   </entry>
   <entry>
-    <title>Error Handling in Nodejs</title>
-    <url>/Error-Handling-in-Nodejs/</url>
-    <content><![CDATA[<!-- TOC -->
-
-<ul>
-<li><a href="#%E8%83%8C%E6%99%AF">背景</a></li>
-<li><a href="#nodejs%E4%B8%AD%E5%BC%82%E5%B8%B8%E6%8A%9B%E5%87%BA%E5%92%8C%E5%A4%84%E7%90%86%E7%9A%845%E7%A7%8D%E6%96%B9%E5%BC%8F">nodejs中异常抛出和处理的5种方式</a></li>
-<li><a href="#%E5%BC%82%E5%B8%B8%E7%9A%842%E5%A4%A7%E5%88%86%E7%B1%BB%E5%92%8C%E5%A4%84%E7%90%86%E7%AD%96%E7%95%A5">异常的2大分类和处理策略</a><ul>
-<li><a href="#%E6%93%8D%E4%BD%9C%E5%A4%B1%E8%B4%A5">操作失败</a></li>
-<li><a href="#%E7%A8%8B%E5%BA%8F%E5%91%98%E5%A4%B1%E8%AF%AF">程序员失误</a></li>
-<li><a href="#%E5%A4%84%E7%90%86%E5%A4%B1%E8%B4%A5">处理失败</a></li>
-</ul>
-</li>
-<li><a href="#%E4%BD%95%E6%97%B6%E4%BB%A5%E4%BB%80%E4%B9%88%E6%96%B9%E5%BC%8F%E6%8A%9B%E5%87%BA%E5%BC%82%E5%B8%B8throw-callback-%E8%BF%98%E6%98%AF-eventemitter">何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）</a></li>
-<li><a href="#%E7%BC%96%E5%86%99%E5%87%BD%E6%95%B0%E6%97%B6%E7%9A%84%E5%BB%BA%E8%AE%AE">编写函数时的建议</a></li>
-<li><a href="#reference">Reference</a></li>
-</ul>
-<!-- /TOC -->
-<span id="more"></span>
-<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>Nodejs是单线程,这会导致如果exception没有合适的处理，会导致整个程序的退出。所以要谨慎处理exception。以及区分不同的异常和何时使用哪种异常抛出方式。</p>
-<hr>
-<h2 id="nodejs中异常抛出和处理的5种方式"><a href="#nodejs中异常抛出和处理的5种方式" class="headerlink" title="nodejs中异常抛出和处理的5种方式"></a>nodejs中异常抛出和处理的5种方式</h2><ol>
-<li>Throw the error as exception<br>这是最熟悉的一种异常方式，跟其他的编程语言时类似的。这类异常如果没有被处理，会导致程序的退出。 <figure class="highlight csharp"><table><tr><td class="code"><pre><span class="line"><span class="function">function <span class="title">calculateSquare</span>(<span class="params">number, callback</span>)</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>) &#123;</span><br><span class="line"><span class="keyword">throw</span> <span class="keyword">new</span> Error(<span class="string">&quot;Argument of type number is expected.&quot;</span>));</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">return</span> number * number;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
-<li>Pass the error to a callback<br>callback是处理异步操作的返回结果的。把错误传给一个callback，这个函数正是为了处理异常和处理异步操作返回结果的。 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number, callback</span>) </span>&#123;</span><br><span class="line"><span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>) &#123;</span><br><span class="line">callback(<span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">&quot;Argument of type number is expected.&quot;</span>));</span><br><span class="line"><span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">callback(<span class="literal">null</span>, result);</span><br><span class="line">&#125;, <span class="number">1000</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">let</span> callback = <span class="function">(<span class="params">error, result</span>) =&gt;</span> &#123;</span><br><span class="line"><span class="keyword">if</span> (error !== <span class="literal">null</span>) &#123;</span><br><span class="line"><span class="built_in">console</span>.log(<span class="string">&quot;Caught error: &quot;</span> + <span class="built_in">String</span>(error));</span><br><span class="line"><span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="built_in">console</span>.log(result);</span><br><span class="line">&#125;;</span><br><span class="line">calculateSquare(<span class="string">&#x27;s&#x27;</span>, callback);</span><br></pre></td></tr></table></figure></li>
-<li>Pass the error to a reject Promise function(ES6出现了Promise)<br>Promise中reject返回的内容可以被catch拿到，resolve返回的内容可以被then拿到 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number</span>) </span>&#123;</span><br><span class="line"><span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve,reject</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>)&#123;</span><br><span class="line">reject(<span class="string">&#x27;Argument of type number is expected&#x27;</span>)</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">resolve(result)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)</span><br><span class="line">&#125;</span><br><span class="line">calculateSquare(<span class="number">2</span>).</span><br><span class="line">then(<span class="function"><span class="params">res</span>=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(res);</span><br><span class="line">&#125;).</span><br><span class="line"><span class="keyword">catch</span>(<span class="function"><span class="params">error</span>=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(error);</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure></li>
-<li>Emit an error event on an EventEmitter<br>通过EventEmitter可以定义自己的事件，事件触发和事件监听。当EventEmitter（事件）内发生错误时，典型的操作是发出error事件，如果该事件没有监听error事件，那么当error事件被发射时，node进程将退出。为了防止node进程退出，应该为error事件添加监听器。 <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="keyword">const</span> emitter = <span class="built_in">require</span>(<span class="string">&#x27;events&#x27;</span>)</span><br><span class="line"><span class="keyword">const</span> myEmitter = <span class="keyword">new</span> emitter();</span><br><span class="line">myEmitter.on(<span class="string">&#x27;error&#x27;</span>,<span class="function">(<span class="params">err</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="built_in">console</span>.log(<span class="string">&#x27;whoops! there was an error&#x27;</span>)</span><br><span class="line">&#125;)</span><br><span class="line">myEmitter.emit(<span class="string">&#x27;error&#x27;</span>,<span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">&#x27;whoops&#x27;</span>));</span><br><span class="line"><span class="comment">//通过发射error而抛出的异常必须通过监听error事件捕获或</span></span><br><span class="line"><span class="comment">//process.on(&#x27;uncaughtException&#x27;, (err)，try catch则不行。</span></span><br></pre></td></tr></table></figure></li>
-<li>Async/Await(ES7)<br>可以通过catch同步代码的方式catch异步代码了，不需要写then。Resolve的参数就是返回值，reject的参数就是catch里的error. <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">calculateSquare</span>(<span class="params">number</span>) </span>&#123;</span><br><span class="line"><span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve,reject</span>)=&gt;</span>&#123;</span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">typeof</span> number !== <span class="string">&quot;number&quot;</span>)&#123;</span><br><span class="line">reject(<span class="string">&#x27;Argument of type number is expected&#x27;</span>)</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line"><span class="keyword">const</span> result = number * number;</span><br><span class="line">resolve(result)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)</span><br><span class="line">&#125;</span><br><span class="line">(<span class="keyword">async</span> <span class="function"><span class="keyword">function</span> <span class="title">test</span>(<span class="params"></span>)</span>&#123;</span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line"><span class="keyword">let</span> res = <span class="keyword">await</span> calculateSquare(<span class="string">&#x27;s&#x27;</span>);</span><br><span class="line"><span class="built_in">console</span>.log(res);</span><br><span class="line">&#125; <span class="keyword">catch</span> (error) &#123;</span><br><span class="line"><span class="built_in">console</span>.log(error)</span><br><span class="line">&#125;</span><br><span class="line">&#125;)()</span><br></pre></td></tr></table></figure></li>
-</ol>
-<hr>
-<h2 id="异常的2大分类和处理策略"><a href="#异常的2大分类和处理策略" class="headerlink" title="异常的2大分类和处理策略"></a>异常的2大分类和处理策略</h2><h3 id="操作失败"><a href="#操作失败" class="headerlink" title="操作失败"></a>操作失败</h3><p>不是程序的bug,是系统本身（oom…）,网络问题，远程服务（5xx，ECONNREFUSED…）</p>
-<ul>
-<li>连接不到服务器</li>
-<li>无法解析主机名</li>
-<li>无效的用户输入</li>
-<li>请求超时</li>
-<li>服务器返回500</li>
-<li>套接字被挂起</li>
-<li>系统内存不足<h3 id="程序员失误"><a href="#程序员失误" class="headerlink" title="程序员失误"></a>程序员失误</h3>是程序里的Bug。这些错误往往可以通过修改代码避免。它们永远都没法被有效的处理。</li>
-<li>读取 undefined 的一个属性</li>
-<li>调用异步函数没有指定回调</li>
-<li>该传对象的时候传了一个字符串</li>
-<li>该传IP地址的时候传了一个对象<h3 id="处理失败"><a href="#处理失败" class="headerlink" title="处理失败"></a>处理失败</h3></li>
-<li>直接处理<br>  有的时候该做什么很清楚。如果你在尝试打开日志文件的时候得到了一个ENOENT错误，很有可能你是第一次打开这个文件，你要做的就是首先创建它。更有意思的例子是，你维护着到服务器（比如数据库）的持久连接，然后遇到了一个“socket hang-up”的异常。这通常意味着要么远端要么本地的网络失败了。很多时候这种错误是暂时的，所以大部分情况下你得重新连接来解决问题。（这和接下来的重试不大一样，因为在你得到这个错误的时候已经不必要重试了）</li>
-<li>把出错扩散到客户端<br> 如果你不知道怎么处理这个异常，最简单的方式就是放弃你正在执行的操作，清理所有开始的，然后把错误传递给客户端。（怎么传递异常是另外一回事了，接下来会讨论）。这种方式适合错误短时间内无法解决的情形。比如，用户提交了不正确的JSON，你再解析一次是没什么帮助的。</li>
-<li>重试操作<br>  对于那些来自网络和远程服务的错误，有的时候重试操作就可以解决问题。比如，远程服务返回了503（服务不可用错误），你可能会在几秒种后重试。如果确定要重试，你应该清晰的用文档记录下将会多次重试，重试多少次直到失败,以及两次重试的间隔。 另外，不要每次都假设需要重试。如果在栈中很深的地方（比如，被一个客户端调用，而那个客户端被另外一个由用户操作的客户端控制），这种情形下快速失败让客户端去重试会更好。如果栈中的每一层都觉得需要重试，用户最终会等待更长的时间，因为每一层都没有意识到下层同时也在尝试。</li>
-<li>直接崩溃<br>  对于那些本不可能发生的错误，或者由程序员失误导致的错误（比如无法连接到同一程序里的本地套接字），可以记录一个错误日志然后直接崩溃。其它的比如内存不足这种错误，是JavaScript这样的脚本语言无法处理的，崩溃是十分合理的。（即便如此，在child_process.exec这样的分离的操作里，得到ENOMEM错误，或者那些你可以合理处理的错误时，你应该考虑这么做）。在你无计可施需要让管理员做修复的时候，你也可以直接崩溃。如果你用光了所有的文件描述符或者没有访问配置文件的权限，这种情况下你什么都做不了，只能等某个用户登录系统把东西修好。</li>
-<li>记录错误，其他什么都不做<br>  有的时候你什么都做不了，没有操作可以重试或者放弃，没有任何理由崩溃掉应用程序。举个例子吧，你用DNS跟踪了一组远程服务，结果有一个DNS失败了。除了记录一条日志并且继续使用剩下的服务以外，你什么都做不了。但是，你至少得记录点什么（凡事都有例外。如果这种情况每秒发生几千次，而你又没法处理，那每次发生都记录可能就不值得了，但是要周期性的记录）。</li>
-<li>立刻崩溃,重启<br>  崩溃是失误来临时最快的恢复可靠服务的方法。奔溃应用程序唯一的负面影响是相连的客户端临时被扰乱。在一个完备的分布式系统里，客户端必须能够通过重连和重试来处理服务端的错误。不管 NodeJS 应用程序是否被允许崩溃，网络和系统的失败已经是一个事实了。</li>
-</ul>
-<hr>
-<h2 id="何时以什么方式抛出异常（Throw，-Callback-还是-EventEmitter）"><a href="#何时以什么方式抛出异常（Throw，-Callback-还是-EventEmitter）" class="headerlink" title="何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）"></a>何时以什么方式抛出异常（Throw， Callback 还是 EventEmitter）</h2><ul>
-<li>throw以同步的方式传递异常–也就是在函数被调用处的相同的上下文。如果调用者（或者调用者的调用者）用了try/catch，则异常可以捕获。如果所有的调用者都没有用，那么程序通常情况下会崩溃（异常也可能会被进程级的uncaughtException）。</li>
-<li>Callback 是最基础的异步传递事件的一种方式。用户传进来一个函数（callback），之后当某个异步操作完成后调用这个 callback。通常 callback 会以callback(err,result)的形式被调用，这种情况下， err和 result必然有一个是非空的，取决于操作是成功还是失败。</li>
-<li>更复杂的情形是，函数没有用 Callback 而是返回一个 EventEmitter 对象，调用者需要监听这个对象的 error事件。这种方式在两种情况下很有用。</li>
-<li>当你在做一个可能会产生多个错误或多个结果的复杂操作的时候。比如，有一个请求一边从数据库取数据一边把数据发送回客户端，而不是等待所有的结果一起到达。在这个例子里，没有用 callback，而是返回了一个 EventEmitter，每个结果会触发一个row 事件，当所有结果发送完毕后会触发end事件，出现错误时会触发一个error事件。</li>
-<li>用在那些具有复杂状态机的对象上，这些对象往往伴随着大量的异步事件。例如，一个套接字是一个EventEmitter，它可能会触发“connect“，”end“，”timeout“，”drain“，”close“事件。这样，很自然地可以把”error“作为另外一种可以被触发的事件。在这种情况下，清楚知道”error“还有其它事件何时被触发很重要，同时被触发的还有什么事件（例如”close“），触发的顺序，还有套接字是否在结束的时候处于关闭状态。</li>
-<li>callback和EventEmitter通常2选1。</li>
-</ul>
-<hr>
-<h2 id="编写函数时的建议"><a href="#编写函数时的建议" class="headerlink" title="编写函数时的建议"></a>编写函数时的建议</h2><p>清楚的知道函数是做什么的，预期参数—参数的类型—参数的额外约束—返回值—<br>还要知道：调用者可能会遇到的操作失败，怎么处理这个失败（抛出，传递给callback，emitter）。<br>使用ERROR对象或它的子类，并且实现 Error 的协议<br>所有错误要么使用 Error 类要么使用它的子类。你应该提供name和message属性。建议在捕获一些比较底层的异常时封装一层，将原始的error转换成自己的error类，方便调用者理解和处理。</p>
-<hr>
-<h2 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h2><p><a href="https://www.joyent.com/node-js/production/design/errors">https://www.joyent.com/node-js/production/design/errors</a><br><a href="https://code.oneapm.com/nodejs/2015/04/13/nodejs-errorhandling/">https://code.oneapm.com/nodejs/2015/04/13/nodejs-errorhandling/</a></p>
-]]></content>
-      <categories>
-        <category>code</category>
-      </categories>
-      <tags>
-        <tag>nodejs</tag>
-        <tag>error-handler</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>书中碎语</title>
     <url>/%E4%B9%A6%E4%B8%AD%E7%A2%8E%E8%AF%AD/</url>
     <content><![CDATA[<p>热恋之中，他反复吟诵这个名字，觉得它是灵感与生命的来源。但当恋情未及苍老便告消逝，他就发现真名的力量变化转向，成为一句诅咒。他不能忍受叫出这个名字时所发出的声音，仿佛每个音节都会直接击中自己的心脏；也不能再次看见哪怕只是近似的字形，它们会使人晕眩得近乎失明。</p>
@@ -309,127 +359,6 @@
       </tags>
   </entry>
   <entry>
-    <title>铲屎官心得</title>
-    <url>/%E9%93%B2%E5%B1%8E%E5%AE%98%E7%9A%84%E6%97%A5%E5%B8%B8/</url>
-    <content><![CDATA[<p>最近生活发生了挺多的变化，都是意料之外的。</p>
-<p>养了一只小狗狗-叫叫，它是我刚从海南回来在楼下捡到的一只小奶狗，那时候它还是奶萌奶萌的，本想着我可能没有时间养小狗，但养了几天觉得还行，狗子挺乖的，没让我操心很多，而且我从小格外喜欢狗狗，也有以后养狗的打算，只是没想到，狗子就这么从天而降，闯入了我的生活，而我的生活也在发生变化着。</p>
-<span id="more"></span>
-
-<p>4月初，从原来租的房子搬到了新的出租屋，房间变小了不少，但是有了带门的阳台，叫叫可以住在阳台上，房间虽小，但是我跟小谢一起安排，空间利用的好不错，有两张独立的学习书桌，一个懒人沙发，一张1.5米的床，一个大衣橱，还有若干储物架，有时觉得在豪华的住宅都比不上我这温馨的小窝。</p>
-<p>没过多久，我们买了一只3个月大的暹罗猫回家，也就是这只小猫，让我觉得，哎，世界再不美好，还有猫就够了，它机灵，可爱，聪明，一天总在固定的时间段撒娇粘人。太幸福了。就这样，莫名其妙的我就猫狗双全了。三个月过去了，我没有跟叫叫分开超过一天，再也没睡过懒觉，也不敢太晚回家，总想着它还关在家里，没办法上厕所，会不会憋的难受。猫咪真的挺让人省心的，但是狗狗，怎么说呢，累并快乐着。奇奇，我们依赖它多一些。而叫叫，依赖我们多一些。每次趁它四处打探的时候躲起来，看到它焦急的到处找你的样子，会深深的体会到你就是它的全世界。被一个生物这么用力的需要着依赖着，是第一次。有时再想，如果当初没养它，我就可以熬夜、赖床、晚上出去嗨。可转念一想，熬夜对身体不好，赖床打破一天的计划，晚上出去嗨也没那么多心情了，还不如回家冲浪，只要隔几个月有一次中长距离的旅行，我就满足了。</p>
-<p>养了两个小家伙后，生活变得充实有规律，小谢忙于找工作，我也忙于手头上一个项目我是owner,好在最后小谢成功上岸，也给忙碌的生活画了一个圆满的逗号。<br>后面想练练车，买辆小车，想10月份去远一点的地方自驾，想去新疆喀什。嘿嘿，生活还是值得期待的。</p>
-<p><a href="https://imgtu.com/i/2S0TCF"><img src="https://z3.ax1x.com/2021/05/25/2S0TCF.jpg" alt="2S0TCF.jpg"></a></p>
-]]></content>
-      <categories>
-        <category>life</category>
-      </categories>
-      <tags>
-        <tag>宠物</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>长滩日出</title>
-    <url>/%E9%95%BF%E6%BB%A9%E6%97%A5%E5%87%BA/</url>
-    <content><![CDATA[<h4 id="星星和月亮掉进海里"><a href="#星星和月亮掉进海里" class="headerlink" title="星星和月亮掉进海里"></a><center>星星和月亮掉进海里</h4><h4 id="所以太阳升起"><a href="#所以太阳升起" class="headerlink" title="所以太阳升起"></a><center>所以太阳升起</h4><span id="more"></span>
-<p><a href="https://imgchr.com/i/scG5xe"><img src="https://s3.ax1x.com/2021/01/18/scG5xe.jpg" alt="scG5xe.jpg"></a><br><a href="https://imgchr.com/i/scGbVI"><img src="https://s3.ax1x.com/2021/01/18/scGbVI.jpg" alt="scGbVI.jpg"></a></p>
-<h4 id="南太平洋的季风吹过"><a href="#南太平洋的季风吹过" class="headerlink" title="南太平洋的季风吹过"></a><center>南太平洋的季风吹过</h4><h4 id="裹挟着海水的咸腥"><a href="#裹挟着海水的咸腥" class="headerlink" title="裹挟着海水的咸腥"></a><center>裹挟着海水的咸腥</h4><h4 id="宇宙山河不吝啬浪漫"><a href="#宇宙山河不吝啬浪漫" class="headerlink" title="宇宙山河不吝啬浪漫"></a><center>宇宙山河不吝啬浪漫</h4><h4 id="赐我满目温柔"><a href="#赐我满目温柔" class="headerlink" title="赐我满目温柔"></a><center>赐我满目温柔</h4><p><a href="https://imgchr.com/i/scGXPf"><img src="https://s3.ax1x.com/2021/01/18/scGXPf.jpg" alt="scGXPf.jpg"></a></p>
-]]></content>
-      <categories>
-        <category>poem</category>
-      </categories>
-      <tags>
-        <tag>长滩岛</tag>
-        <tag>日出日落</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>海南游</title>
-    <url>/%E6%B5%B7%E5%8D%97%E6%B8%B8/</url>
-    <content><![CDATA[<!-- TOC -->
-
-<ul>
-<li><a href="#2021%E3%81%AE%E6%98%A5%E8%8A%82">2021の春节</a></li>
-<li><a href="#%E6%B5%B7%E5%8F%A3">海口</a></li>
-<li><a href="#%E4%B8%89%E4%BA%9A">三亚</a></li>
-</ul>
-<!-- /TOC -->
-<span id="more"></span>
-<h2 id="2021の春节"><a href="#2021の春节" class="headerlink" title="2021の春节"></a>2021の春节</h2><p>当我写下这个标题时，下意识的看了下电脑左下角的日期，不是几时几分，是年份。是年年如此相似，让我难以给每一年一个特殊的标签来记忆？还是不得不承认我的记忆力已经加速衰退？突然就想起那么一句话：生活一半回忆，一半继续。年龄越大，越深体会。  </p>
-<p>本来的春节安排是想去拉萨过年，为什么想去，其实原因远远不是什么诗和远方，只是觉得它够远，与我常年待的地方差异化大，以前有过去的想法，那就干脆去吧，如果说有所期待，一是是坐z164横穿中国，感受最美的风景在路上，以及它是佛教圣地，还蛮感兴趣的。</p>
-<p>后来因为疫情加上小谢要回海南过年，我就打消的去拉萨过春节的想法。一个人旅行，我还没有到达这种境界。于是，行程就变成了去海南度假。这是我第一次春节期间出远门旅行，也不会是最后一次。</p>
-<h2 id="海口"><a href="#海口" class="headerlink" title="海口"></a>海口</h2><p>大年初一，没坐过飞机的爸妈带我去飞机场，哈哈，我爸一直充满好奇的看着大大的航站楼，在理解我做的每一个步骤，彷佛为以后的坐飞机坐准备。意料之中的整个航站楼人不多，飞往海口的途中飞机也很平稳，心情大概是飞机再快一点、再快一点。</p>
-<p>到达海口，见到小谢，开心又奇妙。海口冬天的温度好极了，凉爽，路两旁的椰子树、榕树，也格外清爽。整个城市带着夏季海边复古小镇的滤镜。旧旧的建筑、听不懂的方言、凉爽的清晨、铺满海面的落日以及吃不完的各种粉，组成了我对海口的第一印象。</p>
-<p>旅行对我最大的吸引就是，逃离的快感。是的，身体和心理都是，没人认识我，没人关注我，视觉味觉嗅觉触碰到新的细胞，我只需要感受我自己，自己的每一个细胞。我不再是某公司的员工、某家庭的成员。旅行是身体走出去，灵魂回了家。</p>
-<p>骑楼、食品街、陵水酸粉、海南粉、抱罗粉、清补凉、糟粕醋、海边公园…两天时间足以让我觉得海口真的值得冬天来待几天。在海口悠闲的待了两天之后，即2.14号，我们启程去了三亚。</p>
-<h2 id="三亚"><a href="#三亚" class="headerlink" title="三亚"></a>三亚</h2><p>印象中三亚是个国内很多人度蜜月常去的地方，但作为海岛游的话，总觉得不如菲律宾的一些小岛有意思。但是还是满怀着期待去了，出去玩，哪里都是新鲜的体验。在开往三亚的高铁上，窗外是偏热带的风景，是与以往回山东老家或去其他南方完全不一样的景致，其中有一小段开在海边，如果此时带上耳机，放一首旋律轻快的音乐，心情也会变成音符跳跃起来吧。</p>
-<p>到达三亚后是下午，温度比海口要高，我跟小谢便迫不及待的换上岛服，带上太阳镜，就这么靓仔出街了。先去了鹿回头，一座可以俯瞰三亚的小山，还有一个动人的爱情故事，来这边除了看看风景，还有一些网红拍照经典，我并不排斥网红拍照景点，拍出好看的照片也是让人心情好的事情，但是别只顾着从镜头里看风景就好了。</p>
-<p>傍晚去了耶梦长廊附近的海滩走了走，在海边散步的人还蛮多的，虽然落日被太阳遮挡，但是看到大海总是让人心旷神怡，与仰望星空的感觉类似，渺小如我，却如此自执的一个小小人类。跟小谢想拍出那片既视感的海边照片，奈何屡屡失败，两个人哭笑不得，太难了…晚点去了一家预约好的露天海景西餐厅，因为情人节价格也翻倍，布置的倒浪漫，就是海风确实大，有些凉了。我自诩这是我迄今为止最浪漫的情人节，倒也不只是因为在海景餐厅吃晚饭，是天时地利人和的浪漫，哈哈。吃完饭就溜达回了宾馆。</p>
-<p>第二天去了‘亚龙湾森林公园’，买的套票包含一顿中午的自住。整个森林公园分为几个主要的景点，都用游览车接送，在想玩的经典下车就行。恐高选手表示，那个索道还是挺吓人的。《非诚勿扰2》他们的试婚房也在山里，其实这也是我选择这个景点的原因之一，当时看这部电影的时候，开车从山脚开到房间，再到房间，已经房间周围的小地方，真的挺美的，当时还在想这是哪呀，好想去看看，真正到了，其实风景差异不大，就是人一多，整个欣赏的质量就下降了，匆忙急促感增多。下午3点多逛完，背上我的大旅行包，辗转下一个住所—蜈支洲岛码头。</p>
-<p>在蜈支洲岛码头的那个夜晚让我久久难忘。夜晚的街道是夜宵和酒精组成的，我们在一家简单的不能称作酒吧的地方坐了下了，只有几个位子，位子后面是一个小小的汽车作为装饰，和陌生人分享一个小桌子。听着陌生的故事，羡慕着旅居人的勇敢和洒脱，也为能共享海边这样一个夜晚感到幸运。喝完几杯，我们跑到码头上，躺下来看天空，小谢在认真的找北斗七星，我在认真听大海一阵阵的浪声，在黑夜变得神秘和令人有点恐惧。想起在长滩岛的那个夜晚，我们坐在海滩上，一遍遍被涨潮往后移动，我看着眼前的这片海，它来自南太平洋，我的家，我喜欢的人，都在遥不可及的北方，再看看天空的点点星空，彷佛它们是一样的遥远。那种感觉好奇妙，脱离了熟悉的人和环境，我好像什么也不是，面对浩瀚的大海和宇宙，投影下是自己小小的身躯，不由得发散出一个庞大的哲学问题：我是谁？那时候还陷在痛苦的分手祭奠期，心里想的是所爱隔山海，山海终究是不可平啊。如今，我躺在另一片大海旁边，也不会再思考那些遥远的问题，山海虽不可平，可好在人生海海，终能再遇到愿相互陪伴之人。陪伴，还有什么比这个更珍贵呢。<br><a href="https://imgtu.com/i/6doNkV"><img src="https://s3.ax1x.com/2021/03/13/6doNkV.jpg" alt="6doNkV.jpg"></a></p>
-<p><a href="https://imgtu.com/i/6doUYT"><img src="https://s3.ax1x.com/2021/03/13/6doUYT.jpg" alt="6doUYT.jpg"></a></p>
-<p>来到第三天，我们一大早就去了蜈支洲岛，买了海上游玩项目的套票，玩了个够。拖伞、大小飞鱼….期间小谢同学多次被别人夸，说像小仙女，笑起来眼睛弯弯的。对了，之前那个小酒馆的小姑娘，也说小谢笑起来好甜。哈哈哈，其实我也是最喜欢她开心笑的样子，很有感染力，让别人开心到想给她熊抱。</p>
-<p>随着蜈支洲岛游玩结束，海南的旅行也差不多结束了。我们折返回海口，并在小谢的爷爷奶奶家住了一晚，第二天坐上漫长的绿皮火车回南京。期间，经历了火车+轮渡的方式过琼州海峡、小谢的行李箱被拿错…，whatever 我们还是开开心心的回到南京啦。</p>
-<p>我们下段旅行再见……<br><a href="https://imgtu.com/i/6doafU"><img src="https://s3.ax1x.com/2021/03/13/6doafU.jpg" alt="6doafU.jpg"></a></p>
-]]></content>
-      <categories>
-        <category>travel</category>
-      </categories>
-      <tags>
-        <tag>海南</tag>
-        <tag>三亚</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>docker中的僵尸进程</title>
-    <url>/docker%E4%B8%AD%E7%9A%84%E5%83%B5%E5%B0%B8%E8%BF%9B%E7%A8%8B/</url>
-    <content><![CDATA[<!-- TOC -->
-
-<ul>
-<li><a href="#%E8%83%8C%E6%99%AF">背景：</a></li>
-<li><a href="#%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5">基本概念</a></li>
-<li><a href="#docker%E4%B8%AD%E7%9A%84%E4%B8%8D%E5%90%8C">docker中的不同</a></li>
-<li><a href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95">解决方法</a><ul>
-<li><a href="#%E5%8F%82%E8%80%83">参考</a></li>
-</ul>
-</li>
-</ul>
-<!-- /TOC -->
-
-<h2 id="背景："><a href="#背景：" class="headerlink" title="背景："></a>背景：</h2><p>在项目中使用的是微服务架构，各component通过restful api的协议进行通信。各component跑在docker contanier中，其中一个component的功能是使用puppeteer来跑各种html文件，puppeteer可以理解为提供了一系列的api通过无界面的方式来控制chromium，是一个nodejs库。由于在这个component中会有较多的进程创建和crash，所以发现该docker container中存在大量僵尸进程。故总结了一下原因和解决办法。</p>
-<span id="more"></span>
-<h2 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h2><ul>
-<li><p>僵尸进程（z）：子进程的一种状态—–子进程退出，但是父进程没有调用wait/waitpid获取子进程的状态信息，于是子进程的进程描述符仍然保留在系统中。</p>
-</li>
-<li><p>孤儿进程：子进程的一种状态—–父进程先于子进程退出。</p>
-</li>
-<li><p>PID=1的init进程：在自举过程结束后由内核调用的。孤儿进程会被init进程接管，成为所有孤儿进程的父进程。被init进程接管的孤儿进程会不会成为僵尸进程？不会！因为init被编写为无论如何时只要有一个子进程终止，init就会调用wait函数获取其最终状态。</p>
-</li>
-<li><p>僵尸进程的危害：在每个进程结束后，内核会释放该进程所有的资源（文件、内存等），但是仍保留一定的信息（进程号、退出状态、cpu时间等），这一部分信息要等父进程调用wait/waitpid才会释放，如果不被释放，其进程号一直占用，而系统能产生的进程号是有限的，如果有大量的僵尸进程，可能导致系统无法产生新的进程。僵尸进程为死掉的进程，所以不能再接收任何信号，kill也无法杀死。一个可选的解决方法是，杀死父进程（需要谨慎……），于是僵尸进程成为”孤儿进程”，它由给1号进程init收养，init 进程会周期性地去调用 wait 系统调用来清除它的僵尸孩子。</p>
-</li>
-</ul>
-<h2 id="docker中的不同"><a href="#docker中的不同" class="headerlink" title="docker中的不同"></a>docker中的不同</h2><p>Docker: 在docker中没有init进程，pid=1的进程为容器的主进程（npm/node.js……）</p>
-<blockquote>
-<p>Turns out that NodeJS is not able to receive signals and handle them appropriately (if it runs as PID 1). By signals, I mean kernel signals like SIGTERM, SIGINT, etc.<br>The following code wouldn’t work at all if you run NodeJS as PID 1:</p>
-<p><strong>process.on(‘SIGTERM’, function onSigterm()<br>{<br>process.exit(0);</strong>  //do the cleaning job, but it wouldn’t<br><strong>}</strong>);</p>
-<p>As a result, you will get a zombie process which will be terminated forcefully via SIGKILL signal, meaning, that your “clean up” code will not be called at all.</p>
-</blockquote>
-<p><strong>也就是说nodjs进程在pid不等于1的时候是可以handle 退出信号的。但是pid=1的情况下就不可以了。</strong></p>
-<p><strong>So,What is Special With Pid 1?</strong></p>
-<blockquote>
-<p>The process with PID 1 differs from the other processes in the following ways:<br>    1. When the process with pid 1 die for any reason, all other processes are killed with KILL signal<br>    2. When any process having children dies for any reason, its children are reparented to process with PID 1<br>    3. Many signals which have default action of Term do not have one for PID 1.<br> In practice the most inconvenient one is the last one. For development purposes it effectively means you can’t stop process by sending SIGTERM or SIGINT, if process have not installed a signal handler.<br>At the end of the day, all above means most processes that were not explicitly designed to run as PID 1 (which are all applications except supervisors), do not run well. </p>
-</blockquote>
-<h2 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h2><p>dumb-init<br>使用dumb-init 作为初始进程，确保所有子进程都由dumb-init 进程创建。写到dockfile中：apt-get install -y dumb-init=1.2.2-1.1</p>
-<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="https://www.elastic.io/nodejs-as-pid-1-under-docker-images">https://www.elastic.io/nodejs-as-pid-1-under-docker-images</a><br><a href="https://vagga.readthedocs.io/en/latest/pid1mode.html">https://vagga.readthedocs.io/en/latest/pid1mode.html</a></p>
-]]></content>
-      <categories>
-        <category>code</category>
-      </categories>
-      <tags>
-        <tag>docker</tag>
-        <tag>僵尸进程</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>分析azure servicebus的一次bug fix</title>
     <url>/%E5%88%86%E6%9E%90azure-servicebus%E7%9A%84%E4%B8%80%E6%AC%A1bug-fix/</url>
     <content><![CDATA[<!-- TOC -->
@@ -473,6 +402,43 @@
       <tags>
         <tag>azure</tag>
         <tag>servicebus</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>海南游</title>
+    <url>/%E6%B5%B7%E5%8D%97%E6%B8%B8/</url>
+    <content><![CDATA[<!-- TOC -->
+
+<ul>
+<li><a href="#2021%E3%81%AE%E6%98%A5%E8%8A%82">2021の春节</a></li>
+<li><a href="#%E6%B5%B7%E5%8F%A3">海口</a></li>
+<li><a href="#%E4%B8%89%E4%BA%9A">三亚</a></li>
+</ul>
+<!-- /TOC -->
+<span id="more"></span>
+<h2 id="2021の春节"><a href="#2021の春节" class="headerlink" title="2021の春节"></a>2021の春节</h2><p>当我写下这个标题时，下意识的看了下电脑左下角的日期，不是几时几分，是年份。是年年如此相似，让我难以给每一年一个特殊的标签来记忆？还是不得不承认我的记忆力已经加速衰退？突然就想起那么一句话：生活一半回忆，一半继续。年龄越大，越深体会。  </p>
+<p>本来的春节安排是想去拉萨过年，为什么想去，其实原因远远不是什么诗和远方，只是觉得它够远，与我常年待的地方差异化大，以前有过去的想法，那就干脆去吧，如果说有所期待，一是是坐z164横穿中国，感受最美的风景在路上，以及它是佛教圣地，还蛮感兴趣的。</p>
+<p>后来因为疫情加上小谢要回海南过年，我就打消的去拉萨过春节的想法。一个人旅行，我还没有到达这种境界。于是，行程就变成了去海南度假。这是我第一次春节期间出远门旅行，也不会是最后一次。</p>
+<h2 id="海口"><a href="#海口" class="headerlink" title="海口"></a>海口</h2><p>大年初一，没坐过飞机的爸妈带我去飞机场，哈哈，我爸一直充满好奇的看着大大的航站楼，在理解我做的每一个步骤，彷佛为以后的坐飞机坐准备。意料之中的整个航站楼人不多，飞往海口的途中飞机也很平稳，心情大概是飞机再快一点、再快一点。</p>
+<p>到达海口，见到小谢，开心又奇妙。海口冬天的温度好极了，凉爽，路两旁的椰子树、榕树，也格外清爽。整个城市带着夏季海边复古小镇的滤镜。旧旧的建筑、听不懂的方言、凉爽的清晨、铺满海面的落日以及吃不完的各种粉，组成了我对海口的第一印象。</p>
+<p>旅行对我最大的吸引就是，逃离的快感。是的，身体和心理都是，没人认识我，没人关注我，视觉味觉嗅觉触碰到新的细胞，我只需要感受我自己，自己的每一个细胞。我不再是某公司的员工、某家庭的成员。旅行是身体走出去，灵魂回了家。</p>
+<p>骑楼、食品街、陵水酸粉、海南粉、抱罗粉、清补凉、糟粕醋、海边公园…两天时间足以让我觉得海口真的值得冬天来待几天。在海口悠闲的待了两天之后，即2.14号，我们启程去了三亚。</p>
+<h2 id="三亚"><a href="#三亚" class="headerlink" title="三亚"></a>三亚</h2><p>印象中三亚是个国内很多人度蜜月常去的地方，但作为海岛游的话，总觉得不如菲律宾的一些小岛有意思。但是还是满怀着期待去了，出去玩，哪里都是新鲜的体验。在开往三亚的高铁上，窗外是偏热带的风景，是与以往回山东老家或去其他南方完全不一样的景致，其中有一小段开在海边，如果此时带上耳机，放一首旋律轻快的音乐，心情也会变成音符跳跃起来吧。</p>
+<p>到达三亚后是下午，温度比海口要高，我跟小谢便迫不及待的换上岛服，带上太阳镜，就这么靓仔出街了。先去了鹿回头，一座可以俯瞰三亚的小山，还有一个动人的爱情故事，来这边除了看看风景，还有一些网红拍照经典，我并不排斥网红拍照景点，拍出好看的照片也是让人心情好的事情，但是别只顾着从镜头里看风景就好了。</p>
+<p>傍晚去了耶梦长廊附近的海滩走了走，在海边散步的人还蛮多的，虽然落日被太阳遮挡，但是看到大海总是让人心旷神怡，与仰望星空的感觉类似，渺小如我，却如此自执的一个小小人类。跟小谢想拍出那片既视感的海边照片，奈何屡屡失败，两个人哭笑不得，太难了…晚点去了一家预约好的露天海景西餐厅，因为情人节价格也翻倍，布置的倒浪漫，就是海风确实大，有些凉了。我自诩这是我迄今为止最浪漫的情人节，倒也不只是因为在海景餐厅吃晚饭，是天时地利人和的浪漫，哈哈。吃完饭就溜达回了宾馆。</p>
+<p>第二天去了‘亚龙湾森林公园’，买的套票包含一顿中午的自住。整个森林公园分为几个主要的景点，都用游览车接送，在想玩的经典下车就行。恐高选手表示，那个索道还是挺吓人的。《非诚勿扰2》他们的试婚房也在山里，其实这也是我选择这个景点的原因之一，当时看这部电影的时候，开车从山脚开到房间，再到房间，已经房间周围的小地方，真的挺美的，当时还在想这是哪呀，好想去看看，真正到了，其实风景差异不大，就是人一多，整个欣赏的质量就下降了，匆忙急促感增多。下午3点多逛完，背上我的大旅行包，辗转下一个住所—蜈支洲岛码头。</p>
+<p>在蜈支洲岛码头的那个夜晚让我久久难忘。夜晚的街道是夜宵和酒精组成的，我们在一家简单的不能称作酒吧的地方坐了下了，只有几个位子，位子后面是一个小小的汽车作为装饰，和陌生人分享一个小桌子。听着陌生的故事，羡慕着旅居人的勇敢和洒脱，也为能共享海边这样一个夜晚感到幸运。喝完几杯，我们跑到码头上，躺下来看天空，小谢在认真的找北斗七星，我在认真听大海一阵阵的浪声，在黑夜变得神秘和令人有点恐惧。想起在长滩岛的那个夜晚，我们坐在海滩上，一遍遍被涨潮往后移动，我看着眼前的这片海，它来自南太平洋，我的家，我喜欢的人，都在遥不可及的北方，再看看天空的点点星空，彷佛它们是一样的遥远。那种感觉好奇妙，脱离了熟悉的人和环境，我好像什么也不是，面对浩瀚的大海和宇宙，投影下是自己小小的身躯，不由得发散出一个庞大的哲学问题：我是谁？那时候还陷在痛苦的分手祭奠期，心里想的是所爱隔山海，山海终究是不可平啊。如今，我躺在另一片大海旁边，也不会再思考那些遥远的问题，山海虽不可平，可好在人生海海，终能再遇到愿相互陪伴之人。陪伴，还有什么比这个更珍贵呢。<br><a href="https://imgtu.com/i/6doNkV"><img src="https://s3.ax1x.com/2021/03/13/6doNkV.jpg" alt="6doNkV.jpg"></a></p>
+<p><a href="https://imgtu.com/i/6doUYT"><img src="https://s3.ax1x.com/2021/03/13/6doUYT.jpg" alt="6doUYT.jpg"></a></p>
+<p>来到第三天，我们一大早就去了蜈支洲岛，买了海上游玩项目的套票，玩了个够。拖伞、大小飞鱼….期间小谢同学多次被别人夸，说像小仙女，笑起来眼睛弯弯的。对了，之前那个小酒馆的小姑娘，也说小谢笑起来好甜。哈哈哈，其实我也是最喜欢她开心笑的样子，很有感染力，让别人开心到想给她熊抱。</p>
+<p>随着蜈支洲岛游玩结束，海南的旅行也差不多结束了。我们折返回海口，并在小谢的爷爷奶奶家住了一晚，第二天坐上漫长的绿皮火车回南京。期间，经历了火车+轮渡的方式过琼州海峡、小谢的行李箱被拿错…，whatever 我们还是开开心心的回到南京啦。</p>
+<p>我们下段旅行再见……<br><a href="https://imgtu.com/i/6doafU"><img src="https://s3.ax1x.com/2021/03/13/6doafU.jpg" alt="6doafU.jpg"></a></p>
+]]></content>
+      <categories>
+        <category>travel</category>
+      </categories>
+      <tags>
+        <tag>海南</tag>
+        <tag>三亚</tag>
       </tags>
   </entry>
   <entry>
@@ -540,6 +506,214 @@
       </categories>
       <tags>
         <tag>长沙</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>铲屎官心得</title>
+    <url>/%E9%93%B2%E5%B1%8E%E5%AE%98%E7%9A%84%E6%97%A5%E5%B8%B8/</url>
+    <content><![CDATA[<p>最近生活发生了挺多的变化，都是意料之外的。</p>
+<p>养了一只小狗狗-叫叫，它是我刚从海南回来在楼下捡到的一只小奶狗，那时候它还是奶萌奶萌的，本想着我可能没有时间养小狗，但养了几天觉得还行，狗子挺乖的，没让我操心很多，而且我从小格外喜欢狗狗，也有以后养狗的打算，只是没想到，狗子就这么从天而降，闯入了我的生活，而我的生活也在发生变化着。</p>
+<span id="more"></span>
+
+<p>4月初，从原来租的房子搬到了新的出租屋，房间变小了不少，但是有了带门的阳台，叫叫可以住在阳台上，房间虽小，但是我跟小谢一起安排，空间利用的好不错，有两张独立的学习书桌，一个懒人沙发，一张1.5米的床，一个大衣橱，还有若干储物架，有时觉得在豪华的住宅都比不上我这温馨的小窝。</p>
+<p>没过多久，我们买了一只3个月大的暹罗猫回家，也就是这只小猫，让我觉得，哎，世界再不美好，还有猫就够了，它机灵，可爱，聪明，一天总在固定的时间段撒娇粘人。太幸福了。就这样，莫名其妙的我就猫狗双全了。三个月过去了，我没有跟叫叫分开超过一天，再也没睡过懒觉，也不敢太晚回家，总想着它还关在家里，没办法上厕所，会不会憋的难受。猫咪真的挺让人省心的，但是狗狗，怎么说呢，累并快乐着。奇奇，我们依赖它多一些。而叫叫，依赖我们多一些。每次趁它四处打探的时候躲起来，看到它焦急的到处找你的样子，会深深的体会到你就是它的全世界。被一个生物这么用力的需要着依赖着，是第一次。有时再想，如果当初没养它，我就可以熬夜、赖床、晚上出去嗨。可转念一想，熬夜对身体不好，赖床打破一天的计划，晚上出去嗨也没那么多心情了，还不如回家冲浪，只要隔几个月有一次中长距离的旅行，我就满足了。</p>
+<p>养了两个小家伙后，生活变得充实有规律，小谢忙于找工作，我也忙于手头上一个项目我是owner,好在最后小谢成功上岸，也给忙碌的生活画了一个圆满的逗号。<br>后面想练练车，买辆小车，想10月份去远一点的地方自驾，想去新疆喀什。嘿嘿，生活还是值得期待的。</p>
+<p><a href="https://imgtu.com/i/2S0TCF"><img src="https://z3.ax1x.com/2021/05/25/2S0TCF.jpg" alt="2S0TCF.jpg"></a></p>
+]]></content>
+      <categories>
+        <category>life</category>
+      </categories>
+      <tags>
+        <tag>宠物</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>长滩日出</title>
+    <url>/%E9%95%BF%E6%BB%A9%E6%97%A5%E5%87%BA/</url>
+    <content><![CDATA[<h4 id="星星和月亮掉进海里"><a href="#星星和月亮掉进海里" class="headerlink" title="星星和月亮掉进海里"></a><center>星星和月亮掉进海里</h4><h4 id="所以太阳升起"><a href="#所以太阳升起" class="headerlink" title="所以太阳升起"></a><center>所以太阳升起</h4><span id="more"></span>
+<p><a href="https://imgchr.com/i/scG5xe"><img src="https://s3.ax1x.com/2021/01/18/scG5xe.jpg" alt="scG5xe.jpg"></a><br><a href="https://imgchr.com/i/scGbVI"><img src="https://s3.ax1x.com/2021/01/18/scGbVI.jpg" alt="scGbVI.jpg"></a></p>
+<h4 id="南太平洋的季风吹过"><a href="#南太平洋的季风吹过" class="headerlink" title="南太平洋的季风吹过"></a><center>南太平洋的季风吹过</h4><h4 id="裹挟着海水的咸腥"><a href="#裹挟着海水的咸腥" class="headerlink" title="裹挟着海水的咸腥"></a><center>裹挟着海水的咸腥</h4><h4 id="宇宙山河不吝啬浪漫"><a href="#宇宙山河不吝啬浪漫" class="headerlink" title="宇宙山河不吝啬浪漫"></a><center>宇宙山河不吝啬浪漫</h4><h4 id="赐我满目温柔"><a href="#赐我满目温柔" class="headerlink" title="赐我满目温柔"></a><center>赐我满目温柔</h4><p><a href="https://imgchr.com/i/scGXPf"><img src="https://s3.ax1x.com/2021/01/18/scGXPf.jpg" alt="scGXPf.jpg"></a></p>
+]]></content>
+      <categories>
+        <category>poem</category>
+      </categories>
+      <tags>
+        <tag>长滩岛</tag>
+        <tag>日出日落</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>使用kubeadm搭建k8s</title>
+    <url>/%E4%BD%BF%E7%94%A8kubeadm%E6%90%AD%E5%BB%BAk8s/</url>
+    <content><![CDATA[<!-- TOC -->
+
+<ul>
+<li><a href="#0x00-what-is-kubeadm">0x00 what is kubeadm?</a></li>
+<li><a href="#0x01-%E7%8E%AF%E5%A2%83%E5%87%86%E5%A4%87">0x01 环境准备</a></li>
+<li><a href="#0x02-%E5%AE%89%E8%A3%85master">0x02 安装master</a></li>
+<li><a href="#0x03-%E5%AE%89%E8%A3%85node">0x03 安装node</a></li>
+<li><a href="#0x03-%E6%B5%8B%E8%AF%95k8s-cluster">0x03 测试k8s cluster</a></li>
+<li><a href="#0x04-%E8%B8%A9%E7%9A%84%E5%9D%91%E5%92%8Csolution">0x04 踩的坑和solution</a></li>
+<li><a href="#0x05-%E6%80%BB%E7%BB%93">0x05 总结</a></li>
+<li><a href="#references">references</a></li>
+</ul>
+<!-- /TOC -->
+<span id="more"></span>
+<h2 id="0x00-what-is-kubeadm"><a href="#0x00-what-is-kubeadm" class="headerlink" title="0x00 what is kubeadm?"></a>0x00 what is kubeadm?</h2><p>kubeadm 通过执行必要的操作来启动和运行最小可用集群。提供了 kubeadm init 和 kubeadm join 的工具。</p>
+<ul>
+<li><p>kubeadm init的任务：</p>
+<ol>
+<li><strong>环境检查-preflight</strong>。包括操作系统内核，Cgroup是否可用，端口是否被占用，docker是否安装等等。</li>
+<li>生成证书，kube api的访问是tls,证书会存放在/etc/kubernetes/pki目录下。</li>
+<li>生成其他组件访问apiserver的配置文件，路径是/etc/kubernetes,文件包括admin.conf, controller-manager.conf, kubelet.conf, scheduler.conf，其中admin是给kubectl操作时用的，告诉kubectl去连接哪个api server去操作。</li>
+<li>会为<strong>api server, controller manager, scheduler, etcd生成pod配置文件</strong>，放在/etc/kubernetes/manifests路径下，kubelet会更具该路径下的配置文件，<strong>启动相应的pod</strong>。</li>
+<li>此时<strong>master组件基本上启动了</strong>，kubeadm会检查 localhost:6443/healthz这个url，等待master组件完全启动。启动完成后，会为集群生成一个bootstrap token,后续节点拿到这个token后才能通过kubeadm join来加入这个集群。这个token会被保存在etcd中。</li>
+<li>最后一步，安装<strong>默认插件kube-proxy和core-dns</strong>。他们是为整个集群提供服务发现和dns解析用的。<strong>这两个也是以pod的方式启动</strong>。</li>
+</ol>
+</li>
+<li><p>kubeadm join的任务：</p>
+<p>  join的流程相比init来说简单不少，任何一台机器想要加入集群，必须要拿到server端的ca证书才能和其建立tls连接，那么如何在不手动拷贝的情况下拿到server的ca证书，这就需要指定一个token来证明node的合法性。于是便需要以下这样的命令来加入集群。加入后，ca.crt证书文件也将被存放到/etc/kubenetes/pki目录下。</p>
+<pre><code>  kubeadm join 192.168.0.233:6443 --token sd8a51.017go0q0mj7kiu4p \
+  --discovery-token-ca-cert-hash sha256:94e0877bd0852665528c7fd124f6fdd8559283451e30747df3a35a3bc7dec1f2
+</code></pre>
+</li>
+</ul>
+<h2 id="0x01-环境准备"><a href="#0x01-环境准备" class="headerlink" title="0x01 环境准备"></a>0x01 环境准备</h2><ul>
+<li>Centos8 2cpu 2g  mini install</li>
+<li>安装脚本  <figure class="highlight js"><table><tr><td class="code"><pre><span class="line"><span class="comment">//将net.bridge的设置写到k8s.conf中，使netfilter对linux 网桥上的ipv4/ipv6包过滤，=1后，网桥转发包时也会被iptables的forward所过滤</span></span><br><span class="line">cat &lt;&lt;EOF | sudo tee /etc/sysctl.d/k8s.conf</span><br><span class="line">net.bridge.bridge-nf-call-ip6tables = <span class="number">1</span></span><br><span class="line">net.bridge.bridge-nf-call-iptables = <span class="number">1</span></span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line"><span class="comment">//从所有系统配置文件加载设置</span></span><br><span class="line">sudo sysctl --system</span><br><span class="line"></span><br><span class="line"><span class="comment">//配置k8s repo</span></span><br><span class="line">cat &lt;&lt;EOF | sudo tee /etc/yum.repos.d/kubernetes.repo</span><br><span class="line">[kubernetes]</span><br><span class="line">name=Kubernetes</span><br><span class="line">baseurl=https:<span class="comment">//packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch</span></span><br><span class="line">enabled=<span class="number">1</span></span><br><span class="line">gpgcheck=<span class="number">1</span></span><br><span class="line">repo_gpgcheck=<span class="number">1</span></span><br><span class="line">gpgkey=https:<span class="comment">//packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg</span></span><br><span class="line">exclude=kubelet kubeadm kubectl</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line"><span class="comment">// Set SELinux in permissive mode (effectively disabling it)</span></span><br><span class="line">sudo setenforce <span class="number">0</span></span><br><span class="line">sudo sed -i <span class="string">&#x27;s/^SELINUX=enforcing$/SELINUX=permissive/&#x27;</span> /etc/selinux/config</span><br><span class="line"></span><br><span class="line"><span class="comment">//安装kubectl kubectl和kubeadm,kubeadm不负责安装和管理kubrctl和kubelet</span></span><br><span class="line">sudo yum install -y kubectl-<span class="number">1.18</span><span class="number">.8</span>-<span class="number">0</span> kubelet-<span class="number">1.18</span><span class="number">.8</span>-<span class="number">0</span> kubeadm-<span class="number">1.18</span><span class="number">.8</span>-<span class="number">0</span>  --disableexcludes=kubernetes</span><br><span class="line"></span><br><span class="line"><span class="comment">//激活kubelet，开机自动启动</span></span><br><span class="line">sudo systemctl enable --now kubelet</span><br><span class="line"></span><br><span class="line">yum -y install yum-utils</span><br><span class="line"></span><br><span class="line">yum-config-manager     --add-repo     https:<span class="comment">//download.docker.com/linux/centos/docker-ce.repo</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//安装docker和contained</span></span><br><span class="line">yum install -y  containerd.io-<span class="number">1.2</span><span class="number">.13</span> docker-ce-<span class="number">19.03</span><span class="number">.11</span>  docker-ce-cli-<span class="number">19.03</span><span class="number">.11</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//开机自动启动docker</span></span><br><span class="line">systemctl enable docker</span><br><span class="line"></span><br><span class="line"><span class="comment">//配置containerd</span></span><br><span class="line">mkdir -p /etc/containerd &amp;&amp; containerd config <span class="keyword">default</span> &gt; <span class="regexp">/etc/</span>containerd/config.toml</span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li>准备kubeadm-config.yaml  <figure class="highlight yml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">kubeadm.k8s.io/v1beta2</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ClusterConfiguration</span></span><br><span class="line"><span class="attr">kubernetesVersion:</span> <span class="string">v1.18.8</span></span><br><span class="line"><span class="attr">controlPlaneEndpoint:</span> <span class="string">&quot;your-node-ip:6443&quot;</span><span class="string">（这边要记得改成master</span> <span class="string">ip）</span></span><br><span class="line"><span class="attr">networking:</span></span><br><span class="line">   <span class="attr">podSubnet:</span> <span class="string">&quot;10.244.0.0/16&quot;</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<h2 id="0x02-安装master"><a href="#0x02-安装master" class="headerlink" title="0x02 安装master"></a>0x02 安装master</h2></li>
+</ul>
+<ol>
+<li><p>sudo bash init_vm.sh</p>
+<p> <em>环境ready,软件ready</em></p>
+</li>
+<li><p>swap off and close firewall</p>
+<p> <em>关闭系统交换区和防火墙</em></p>
+</li>
+<li><p>sudo kubeadm init –config=kubeadm-config.yaml –upload-certs –pod-network-cidr=10.244.0.0/16 </p>
+<p> <em>使用kubeadm安装k8s环境，此操作成功后，k8s的master上的系统pod是ready(除了core-dns),其中–pod-network-cidr是中设置pod的网络范围，需要于kubeadm-conf里面保持一致。执行完之后需要根据输出提示将admin.conf 拷贝到$HOME/.kube/config下，使其当前用户可以使用kubectl命令</em></p>
+ <figure class="highlight js"><table><tr><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubeadm init --pod-network-cidr=<span class="number">10.244</span><span class="number">.0</span><span class="number">.0</span>/<span class="number">16</span></span><br><span class="line">I0618 <span class="number">09</span>:<span class="number">50</span>:<span class="number">30.846793</span> <span class="number">2033860</span> version.go:<span class="number">252</span>] remote version is much newer: v1<span class="number">.21</span><span class="number">.2</span>; falling back to: stable-<span class="number">1.18</span></span><br><span class="line">W0618 <span class="number">09</span>:<span class="number">50</span>:<span class="number">31.514380</span> <span class="number">2033860</span> configset.go:<span class="number">202</span>] WARNING: kubeadm cannot validate component configs <span class="keyword">for</span> API groups [kubelet.config.k8s.io kubeproxy.config.k8s.io]</span><br><span class="line">[init] Using Kubernetes version: v1<span class="number">.18</span><span class="number">.20</span></span><br><span class="line">[preflight] Running pre-flight checks</span><br><span class="line">		[WARNING IsDockerSystemdCheck]: detected <span class="string">&quot;cgroupfs&quot;</span> <span class="keyword">as</span> the Docker cgroup driver. The recommended driver is <span class="string">&quot;systemd&quot;</span>. Please follow the guide at https:<span class="comment">//kubernetes.io/docs/setup/cri/</span></span><br><span class="line">		[WARNING FileExisting-tc]: tc not found <span class="keyword">in</span> system path</span><br><span class="line">		[WARNING SystemVerification]: <span class="built_in">this</span> Docker version is not on the list <span class="keyword">of</span> validated versions: <span class="number">20.10</span><span class="number">.7</span>. Latest validated version: <span class="number">19.03</span></span><br><span class="line">[preflight] Pulling images required <span class="keyword">for</span> setting up a Kubernetes cluster</span><br><span class="line">[preflight] This might take a minute or two, depending on the speed <span class="keyword">of</span> your internet connection</span><br><span class="line">[preflight] You can also perform <span class="built_in">this</span> action <span class="keyword">in</span> beforehand using <span class="string">&#x27;kubeadm config images pull&#x27;</span></span><br><span class="line">[kubelet-start] Writing kubelet environment file <span class="keyword">with</span> flags to file <span class="string">&quot;/var/lib/kubelet/kubeadm-flags.env&quot;</span></span><br><span class="line">[kubelet-start] Writing kubelet configuration to file <span class="string">&quot;/var/lib/kubelet/config.yaml&quot;</span></span><br><span class="line">[kubelet-start] Starting the kubelet</span><br><span class="line">[certs] Using certificateDir folder <span class="string">&quot;/etc/kubernetes/pki&quot;</span></span><br><span class="line">[certs] Generating <span class="string">&quot;ca&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;apiserver&quot;</span> certificate and key</span><br><span class="line">[certs] apiserver serving cert is signed <span class="keyword">for</span> DNS names [localhost.localdomain kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [<span class="number">10.96</span><span class="number">.0</span><span class="number">.1</span> <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>]</span><br><span class="line">[certs] Generating <span class="string">&quot;apiserver-kubelet-client&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;front-proxy-ca&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;front-proxy-client&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;etcd/ca&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;etcd/server&quot;</span> certificate and key</span><br><span class="line">[certs] etcd/server serving cert is signed <span class="keyword">for</span> DNS names [localhost.localdomain localhost] and IPs [<span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span> ::<span class="number">1</span>]</span><br><span class="line">[certs] Generating <span class="string">&quot;etcd/peer&quot;</span> certificate and key</span><br><span class="line">[certs] etcd/peer serving cert is signed <span class="keyword">for</span> DNS names [localhost.localdomain localhost] and IPs [<span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span> ::<span class="number">1</span>]</span><br><span class="line">[certs] Generating <span class="string">&quot;etcd/healthcheck-client&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;apiserver-etcd-client&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;sa&quot;</span> key and public key</span><br><span class="line">[kubeconfig] Using kubeconfig folder <span class="string">&quot;/etc/kubernetes&quot;</span></span><br><span class="line">[kubeconfig] Writing <span class="string">&quot;admin.conf&quot;</span> kubeconfig file</span><br><span class="line">[kubeconfig] Writing <span class="string">&quot;kubelet.conf&quot;</span> kubeconfig file</span><br><span class="line">[kubeconfig] Writing <span class="string">&quot;controller-manager.conf&quot;</span> kubeconfig file</span><br><span class="line">[kubeconfig] Writing <span class="string">&quot;scheduler.conf&quot;</span> kubeconfig file</span><br><span class="line">[control-plane] Using manifest folder <span class="string">&quot;/etc/kubernetes/manifests&quot;</span></span><br><span class="line">[control-plane] Creating <span class="keyword">static</span> Pod manifest <span class="keyword">for</span> <span class="string">&quot;kube-apiserver&quot;</span></span><br><span class="line">[control-plane] Creating <span class="keyword">static</span> Pod manifest <span class="keyword">for</span> <span class="string">&quot;kube-controller-manager&quot;</span></span><br><span class="line">W0618 <span class="number">09</span>:<span class="number">50</span>:<span class="number">38.716596</span> <span class="number">2033860</span> manifests.go:<span class="number">225</span>] the <span class="keyword">default</span> kube-apiserver authorization-mode is <span class="string">&quot;Node,RBAC&quot;</span>; using <span class="string">&quot;Node,RBAC&quot;</span></span><br><span class="line">[control-plane] Creating <span class="keyword">static</span> Pod manifest <span class="keyword">for</span> <span class="string">&quot;kube-scheduler&quot;</span></span><br><span class="line">W0618 <span class="number">09</span>:<span class="number">50</span>:<span class="number">38.719390</span> <span class="number">2033860</span> manifests.go:<span class="number">225</span>] the <span class="keyword">default</span> kube-apiserver authorization-mode is <span class="string">&quot;Node,RBAC&quot;</span>; using <span class="string">&quot;Node,RBAC&quot;</span></span><br><span class="line">[etcd] Creating <span class="keyword">static</span> Pod manifest <span class="keyword">for</span> local etcd <span class="keyword">in</span> <span class="string">&quot;/etc/kubernetes/manifests&quot;</span></span><br><span class="line">[wait-control-plane] Waiting <span class="keyword">for</span> the kubelet to boot up the control plane <span class="keyword">as</span> <span class="keyword">static</span> Pods <span class="keyword">from</span> directory <span class="string">&quot;/etc/kubernetes/manifests&quot;</span>. This can take up to 4m0s</span><br><span class="line">[apiclient] All control plane components are healthy after <span class="number">20.003587</span> seconds</span><br><span class="line">[upload-config] Storing the configuration used <span class="keyword">in</span> ConfigMap <span class="string">&quot;kubeadm-config&quot;</span> <span class="keyword">in</span> the <span class="string">&quot;kube-system&quot;</span> Namespace</span><br><span class="line">[kubelet] Creating a ConfigMap <span class="string">&quot;kubelet-config-1.18&quot;</span> <span class="keyword">in</span> namespace kube-system <span class="keyword">with</span> the configuration <span class="keyword">for</span> the kubelets <span class="keyword">in</span> the cluster</span><br><span class="line">[upload-certs] Skipping phase. Please see --upload-certs</span><br><span class="line">[mark-control-plane] Marking the node localhost.localdomain <span class="keyword">as</span> control-plane by adding the label <span class="string">&quot;node-role.kubernetes.io/master=&#x27;&#x27;&quot;</span></span><br><span class="line">[mark-control-plane] Marking the node localhost.localdomain <span class="keyword">as</span> control-plane by adding the taints [node-role.kubernetes.io/master:NoSchedule]</span><br><span class="line">[bootstrap-token] Using token: becfq7.y7xx2y8mlixi1aik</span><br><span class="line">[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles</span><br><span class="line">[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to get nodes</span><br><span class="line">[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to post CSRs <span class="keyword">in</span> order <span class="keyword">for</span> nodes to get long term certificate credentials</span><br><span class="line">[bootstrap-token] configured RBAC rules to allow the csrapprover controller automatically approve CSRs <span class="keyword">from</span> a Node Bootstrap Token</span><br><span class="line">[bootstrap-token] configured RBAC rules to allow certificate rotation <span class="keyword">for</span> all node client certificates <span class="keyword">in</span> the cluster</span><br><span class="line">[bootstrap-token] Creating the <span class="string">&quot;cluster-info&quot;</span> ConfigMap <span class="keyword">in</span> the <span class="string">&quot;kube-public&quot;</span> namespace</span><br><span class="line">[kubelet-finalize] Updating <span class="string">&quot;/etc/kubernetes/kubelet.conf&quot;</span> to point to a rotatable kubelet client certificate and key</span><br><span class="line">[addons] Applied essential addon: CoreDNS</span><br><span class="line">[addons] Applied essential addon: kube-proxy</span><br><span class="line"></span><br><span class="line">Your Kubernetes control-plane has initialized successfully!</span><br><span class="line"></span><br><span class="line">To start using your cluster, you need to run the following <span class="keyword">as</span> a regular user:</span><br><span class="line"></span><br><span class="line">mkdir -p $HOME/.kube</span><br><span class="line">sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config</span><br><span class="line">sudo chown $(id -u):$(id -g) $HOME/.kube/config</span><br><span class="line"></span><br><span class="line">You should now deploy a pod network to the cluster.</span><br><span class="line">Run <span class="string">&quot;kubectl apply -f [podnetwork].yaml&quot;</span> <span class="keyword">with</span> one <span class="keyword">of</span> the options listed at:</span><br><span class="line">https:<span class="comment">//kubernetes.io/docs/concepts/cluster-administration/addons/</span></span><br><span class="line"></span><br><span class="line">Then you can join any number <span class="keyword">of</span> worker nodes by running the following on each <span class="keyword">as</span> root:</span><br><span class="line"></span><br><span class="line">kubeadm join <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>:<span class="number">6443</span> --token becfq7.y7xx2y8mlixi1aik \</span><br><span class="line">	--discovery-token-ca-cert-hash sha256:4278e3c6bf6019abe9280c7e7da1c5fe0f3b7d2c05caa282d81f1bafa0809129</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide --all-namespaces</span><br><span class="line">The connection to the server localhost:<span class="number">8080</span> was refused - did you specify the right host or port?</span><br><span class="line">[root@localhost k8s-etp-practice]# mkdir -p $HOME/.kube</span><br><span class="line">[root@localhost k8s-etp-practice]# sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config</span><br><span class="line">[root@localhost k8s-etp-practice]# sudo chown $(id -u):$(id -g) $HOME/.kube/config</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide --all-namespaces</span><br><span class="line">NAMESPACE     NAME                                            READY   STATUS              RESTARTS   AGE    IP               NODE                    NOMINATED NODE   READINESS GATES</span><br><span class="line">kube-system   coredns-66bff467f8-56qtx                        <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          112s   &lt;none&gt;           localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   coredns-66bff467f8-ln989                        <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          112s   &lt;none&gt;           localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   etcd-localhost.localdomain                      <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          2m6s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-apiserver-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          2m6s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-controller-manager-localhost.localdomain   <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          2m6s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-proxy-p8rwq                                <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          112s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-scheduler-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          2m6s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li><p>安装网络插件-flannel</p>
+ <figure class="highlight js"><table><tr><td class="code"><pre><span class="line">wget  https:<span class="comment">//raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml</span></span><br><span class="line">kubectl apply -f kube-flannel.yml</span><br></pre></td></tr></table></figure>
+<p> <em>此操作成功后，k8s的master的组件应该ready</em></p>
+ <figure class="highlight js"><table><tr><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl apply -f kube-flannel.yml</span><br><span class="line">podsecuritypolicy.policy/psp.flannel.unprivileged created</span><br><span class="line">clusterrole.rbac.authorization.k8s.io/flannel created</span><br><span class="line">clusterrolebinding.rbac.authorization.k8s.io/flannel created</span><br><span class="line">serviceaccount/flannel created</span><br><span class="line">configmap/kube-flannel-cfg created</span><br><span class="line">daemonset.apps/kube-flannel-ds created</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide --all-namespaces</span><br><span class="line">NAMESPACE     NAME                                            READY   STATUS    RESTARTS   AGE     IP               NODE                    NOMINATED NODE   READINESS GATES</span><br><span class="line">kube-system   coredns-66bff467f8-56qtx                        <span class="number">0</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m3s    <span class="number">10.244</span><span class="number">.0</span><span class="number">.2</span>       localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   coredns-66bff467f8-ln989                        <span class="number">0</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m3s    <span class="number">10.244</span><span class="number">.0</span><span class="number">.3</span>       localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   etcd-localhost.localdomain                      <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m17s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-apiserver-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m17s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-controller-manager-localhost.localdomain   <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m17s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-flannel-ds-gkgx4                           <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          7s      <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-proxy-p8rwq                                <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m3s    <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-scheduler-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m17s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<h2 id="0x03-安装node"><a href="#0x03-安装node" class="headerlink" title="0x03 安装node"></a>0x03 安装node</h2></li>
+<li><p>clone master机器</p>
+</li>
+<li><p>清理k8s环境，kubeadm reset后手动删除rm -rf $HOME/.kube/config</p>
+</li>
+<li><p>kubeadm join xxxxx(根据master kubeadm init的输出)</p>
+</li>
+</ol>
+<h2 id="0x03-测试k8s-cluster"><a href="#0x03-测试k8s-cluster" class="headerlink" title="0x03 测试k8s cluster"></a>0x03 测试k8s cluster</h2><ol>
+<li><p>查看node,并ready</p>
+<figure class="highlight js"><table><tr><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl get node</span><br><span class="line">NAME                    STATUS   ROLES    AGE   VERSION</span><br><span class="line">k8snode                 Ready    &lt;none&gt;   20h   v1<span class="number">.18</span><span class="number">.8</span></span><br><span class="line">localhost.localdomain   Ready    master   20h   v1<span class="number">.18</span><span class="number">.8</span></span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li><p>kubectl get pod -o wide –all-namespaces 查看pod是否ready</p>
+</li>
+<li><p>kubectl apply -f nginx.yaml 测试pod部署并ready</p>
+</li>
+<li><p>简单测试delete拉起和scale</p>
+<figure class="highlight js"><table><tr><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl <span class="keyword">delete</span> pod nginx-deployment-6b474476c4-6wpwr</span><br><span class="line">pod <span class="string">&quot;nginx-deployment-6b474476c4-6wpwr&quot;</span> deleted</span><br><span class="line">^C</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod</span><br><span class="line">NAME                                READY   STATUS              RESTARTS   AGE</span><br><span class="line">nginx-deployment-6b474476c4-6wpwr   <span class="number">0</span>/<span class="number">1</span>     Terminating         <span class="number">0</span>          20h</span><br><span class="line">nginx-deployment-6b474476c4-8x8z4   <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          2s</span><br><span class="line">nginx-deployment-6b474476c4-hbhxn   <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          20h</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod</span><br><span class="line">NAME                                READY   STATUS        RESTARTS   AGE</span><br><span class="line">nginx-deployment-6b474476c4-6wpwr   <span class="number">0</span>/<span class="number">1</span>     Terminating   <span class="number">0</span>          20h</span><br><span class="line">nginx-deployment-6b474476c4-8x8z4   <span class="number">1</span>/<span class="number">1</span>     Running       <span class="number">0</span>          6s</span><br><span class="line">nginx-deployment-6b474476c4-hbhxn   <span class="number">1</span>/<span class="number">1</span>     Running       <span class="number">0</span>          20h</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl scale --replicas=<span class="number">3</span> ./example/nginx.yaml</span><br><span class="line"><span class="attr">error</span>: <span class="built_in">arguments</span> <span class="keyword">in</span> resource/name form may not have more than one slash</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl scale --replicas=<span class="number">3</span> -f ./example/nginx.yaml</span><br><span class="line">deployment.apps/nginx-deployment scaled</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod</span><br><span class="line">NAME                                READY   STATUS    RESTARTS   AGE</span><br><span class="line">nginx-deployment-6b474476c4-8x8z4   <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          2m25s</span><br><span class="line">nginx-deployment-6b474476c4-hbhxn   <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          20h</span><br><span class="line">nginx-deployment-6b474476c4-l6tlm   <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          4s</span><br><span class="line">[root@localhost k8s-etp-practice]#</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<h2 id="0x04-踩的坑和solution"><a href="#0x04-踩的坑和solution" class="headerlink" title="0x04 踩的坑和solution"></a>0x04 踩的坑和solution</h2></li>
+<li><figure class="highlight js"><table><tr><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide --all-namespaces</span><br><span class="line">The connection to the server localhost:<span class="number">8080</span> was refused - did you specify the right host or port?</span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li><p>kube-flannel-ds crash,意思是flannel插件安装失败，故core-dns也没起来</p>
+<figure class="highlight js"><table><tr><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide -n kube-system</span><br><span class="line">NAME                                            READY   STATUS              RESTARTS   AGE   IP               NODE                    NOMINATED NODE   READINESS GATES</span><br><span class="line">coredns-66bff467f8-bltww                        <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          24h   &lt;none&gt;           localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">coredns-66bff467f8-vfjrd                        <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          24h   &lt;none&gt;           localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">etcd-localhost.localdomain                      <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          24h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-apiserver-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          24h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-controller-manager-localhost.localdomain   <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">3</span>          23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-flannel-ds-48zvh                           <span class="number">0</span>/<span class="number">1</span>     CrashLoopBackOff    <span class="number">276</span>        23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-flannel-ds-amd64-lkc4h                     <span class="number">0</span>/<span class="number">1</span>     CrashLoopBackOff    <span class="number">276</span>        23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.130</span>   k8snode                 &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-flannel-ds-amd64-wvp7q                     <span class="number">0</span>/<span class="number">1</span>     CrashLoopBackOff    <span class="number">276</span>        23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-flannel-ds-nv42w                           <span class="number">0</span>/<span class="number">1</span>     CrashLoopBackOff    <span class="number">277</span>        23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.130</span>   k8snode                 &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-proxy-g2f8d                                <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          24h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-proxy-nlv4n                                <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          24h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.130</span>   k8snode                 &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-scheduler-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">2</span>          23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br></pre></td></tr></table></figure>
+<p>可能是与我之前kubeadm没有指定–pod-network-cidr有关，删除flannel，重新create。在master和node分别执行。</p>
+<figure class="highlight sh"><table><tr><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># ip link delete cni0</span></span><br><span class="line">Cannot find device <span class="string">&quot;cni0&quot;</span></span><br><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># ip link delete flannel.1</span></span><br><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># rm -rf /var/lib/cni/</span></span><br><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># rm -f /etc/cni/net.d/*</span></span><br><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># systemctl restart kubelet</span></span><br></pre></td></tr></table></figure>
+<p>然后清理使用kubedm reset清理环境，使用kubeadm init带–pod-network-cidr初始化后，再create flannel。</p>
+</li>
+<li><p>修改hostname和/etc/hosts 使其两台机器的dns解析没问题</p>
+</li>
+<li><p>在node节点运行kubectl出错：<br>[root@localhost k8s-etp-practice]# kubectl get nodes<br>The connection to the server localhost:8080 was refused - did you specify the right host or port?<br>solution:</p>
+<p> <code>出现这个问题的原因是kubectl命令需要使用kubernetes-admin来运行，解决方法如下，将主节点中的[/etc/kubernetes/admin.conf]文件拷贝到从节点相同目录下，然后配置环境变量：  echo &quot;export KUBECONFIG=/etc/kubernetes/admin.conf&quot; &gt;&gt; ~/.bash_profile  立即生效  source ~/.bash_profile  接着再运行kubectl命令就OK了</code></p>
+</li>
+</ol>
+<h2 id="0x05-总结"><a href="#0x05-总结" class="headerlink" title="0x05 总结"></a>0x05 总结</h2><ol>
+<li><p>master和node的pod和服务</p>
+<table>
+<thead>
+<tr>
+<th>pod</th>
+<th>daemon</th>
+<th>mater</th>
+<th>node</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>apiserver</td>
+<td></td>
+<td>yes</td>
+<td>no</td>
+<td>提供了资源操作的唯一入口，并提供认证、授权、访问控制、API注册和发现等机制</td>
+</tr>
+<tr>
+<td>controller manager</td>
+<td></td>
+<td>yes</td>
+<td>no</td>
+<td>负责维护集群的状态，比如故障检测、自动扩展、滚动更新等</td>
+</tr>
+<tr>
+<td>scheduler</td>
+<td></td>
+<td>yes</td>
+<td>no</td>
+<td>负责资源的调度，按照预定的调度策略将Pod调度到相应的机器上</td>
+</tr>
+<tr>
+<td>kube-proxy</td>
+<td></td>
+<td>yes</td>
+<td>yes</td>
+<td>负责为Service提供cluster内部的服务发现和负载均衡</td>
+</tr>
+<tr>
+<td>add-on(kube-dns/Ingress Controller)</td>
+<td></td>
+<td>yes</td>
+<td>no</td>
+<td>负责为整个集群提供DNS服务/为服务提供外网入口</td>
+</tr>
+<tr>
+<td></td>
+<td>Container runtime</td>
+<td>yes</td>
+<td>yes</td>
+<td>负责镜像管理以及Pod和容器的真正运行（CRI）(docker/containerd)</td>
+</tr>
+<tr>
+<td></td>
+<td>kubelet</td>
+<td>yes</td>
+<td>yes</td>
+<td>负责维护容器的生命周期，同时也负责Volume（CVI）和网络（CNI）的管理</td>
+</tr>
+<tr>
+<td></td>
+<td>etcd</td>
+<td>yes</td>
+<td>no</td>
+<td>保存了整个集群的状态</td>
+</tr>
+</tbody></table>
+</li>
+<li><p>分步确认k8s环境reday并排查问题</p>
+<ul>
+<li>kubeadm init后：kube-scheduler、kube-proxy、kube-apiserver、kube-controller-manager这些pod应该是ready的。</li>
+<li>安装网络插件（flannel）后，coredns、kube-flannel也是ready的。</li>
+</ul>
+</li>
+</ol>
+<h2 id="references"><a href="#references" class="headerlink" title="references"></a>references</h2><p> <a href="https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/">https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/</a><br><a href="http://docs.kubernetes.org.cn/251.html">http://docs.kubernetes.org.cn/251.html</a></p>
+]]></content>
+      <categories>
+        <category>code</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>kubeadm</tag>
       </tags>
   </entry>
 </search>

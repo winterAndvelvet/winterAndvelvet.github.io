@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="k8s,kubeadm," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="0x00 what is kubeadm? 0x01 环境准备 0x02 安装master 0x03 安装node 0x03 测试k8s cluster 0x04 踩的坑和solution 0x05 总结 references">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用kubeadm搭建k8s">
+<meta property="og:url" content="https://blog.winterio.com.cn/%E4%BD%BF%E7%94%A8kubeadm%E6%90%AD%E5%BB%BAk8s/index.html">
+<meta property="og:site_name" content="Winter&#39;s blog">
+<meta property="og:description" content="0x00 what is kubeadm? 0x01 环境准备 0x02 安装master 0x03 安装node 0x03 测试k8s cluster 0x04 踩的坑和solution 0x05 总结 references">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-06-18T14:30:54.000Z">
+<meta property="article:modified_time" content="2021-06-19T14:22:22.878Z">
+<meta property="article:author" content="winter">
+<meta property="article:tag" content="k8s">
+<meta property="article:tag" content="kubeadm">
+<meta name="twitter:card" content="summary">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '',
+    scheme: 'Gemini',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://blog.winterio.com.cn/使用kubeadm搭建k8s/"/>
+
+
+
+
+
+  <title>使用kubeadm搭建k8s | Winter's blog</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Winter's blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">醉后不知天在水，满船清梦压星河</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            About
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            Categories
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-sitemap">
+          <a href="/sitemap.xml" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-sitemap"></i> <br />
+            
+            Sitemap
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            Search
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off"
+             placeholder="Searching..." spellcheck="false"
+             type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://blog.winterio.com.cn/%E4%BD%BF%E7%94%A8kubeadm%E6%90%AD%E5%BB%BAk8s/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="https://z3.ax1x.com/2021/05/19/g4JX1f.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Winter's blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">使用kubeadm搭建k8s</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2021-06-18T22:30:54+08:00">
+                2021-06-18
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/code/" itemprop="url" rel="index">
+                    <span itemprop="name">code</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/%E4%BD%BF%E7%94%A8kubeadm%E6%90%AD%E5%BB%BAk8s/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count valine-comment-count" data-xid="/%E4%BD%BF%E7%94%A8kubeadm%E6%90%AD%E5%BB%BAk8s/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <!-- TOC -->
+
+<ul>
+<li><a href="#0x00-what-is-kubeadm">0x00 what is kubeadm?</a></li>
+<li><a href="#0x01-%E7%8E%AF%E5%A2%83%E5%87%86%E5%A4%87">0x01 环境准备</a></li>
+<li><a href="#0x02-%E5%AE%89%E8%A3%85master">0x02 安装master</a></li>
+<li><a href="#0x03-%E5%AE%89%E8%A3%85node">0x03 安装node</a></li>
+<li><a href="#0x03-%E6%B5%8B%E8%AF%95k8s-cluster">0x03 测试k8s cluster</a></li>
+<li><a href="#0x04-%E8%B8%A9%E7%9A%84%E5%9D%91%E5%92%8Csolution">0x04 踩的坑和solution</a></li>
+<li><a href="#0x05-%E6%80%BB%E7%BB%93">0x05 总结</a></li>
+<li><a href="#references">references</a></li>
+</ul>
+<!-- /TOC -->
+<span id="more"></span>
+<h2 id="0x00-what-is-kubeadm"><a href="#0x00-what-is-kubeadm" class="headerlink" title="0x00 what is kubeadm?"></a>0x00 what is kubeadm?</h2><p>kubeadm 通过执行必要的操作来启动和运行最小可用集群。提供了 kubeadm init 和 kubeadm join 的工具。</p>
+<ul>
+<li><p>kubeadm init的任务：</p>
+<ol>
+<li><strong>环境检查-preflight</strong>。包括操作系统内核，Cgroup是否可用，端口是否被占用，docker是否安装等等。</li>
+<li>生成证书，kube api的访问是tls,证书会存放在/etc/kubernetes/pki目录下。</li>
+<li>生成其他组件访问apiserver的配置文件，路径是/etc/kubernetes,文件包括admin.conf, controller-manager.conf, kubelet.conf, scheduler.conf，其中admin是给kubectl操作时用的，告诉kubectl去连接哪个api server去操作。</li>
+<li>会为<strong>api server, controller manager, scheduler, etcd生成pod配置文件</strong>，放在/etc/kubernetes/manifests路径下，kubelet会更具该路径下的配置文件，<strong>启动相应的pod</strong>。</li>
+<li>此时<strong>master组件基本上启动了</strong>，kubeadm会检查 localhost:6443/healthz这个url，等待master组件完全启动。启动完成后，会为集群生成一个bootstrap token,后续节点拿到这个token后才能通过kubeadm join来加入这个集群。这个token会被保存在etcd中。</li>
+<li>最后一步，安装<strong>默认插件kube-proxy和core-dns</strong>。他们是为整个集群提供服务发现和dns解析用的。<strong>这两个也是以pod的方式启动</strong>。</li>
+</ol>
+</li>
+<li><p>kubeadm join的任务：</p>
+<p>  join的流程相比init来说简单不少，任何一台机器想要加入集群，必须要拿到server端的ca证书才能和其建立tls连接，那么如何在不手动拷贝的情况下拿到server的ca证书，这就需要指定一个token来证明node的合法性。于是便需要以下这样的命令来加入集群。加入后，ca.crt证书文件也将被存放到/etc/kubenetes/pki目录下。</p>
+<pre><code>  kubeadm join 192.168.0.233:6443 --token sd8a51.017go0q0mj7kiu4p \
+  --discovery-token-ca-cert-hash sha256:94e0877bd0852665528c7fd124f6fdd8559283451e30747df3a35a3bc7dec1f2
+</code></pre>
+</li>
+</ul>
+<h2 id="0x01-环境准备"><a href="#0x01-环境准备" class="headerlink" title="0x01 环境准备"></a>0x01 环境准备</h2><ul>
+<li>Centos8 2cpu 2g  mini install</li>
+<li>安装脚本  <figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//将net.bridge的设置写到k8s.conf中，使netfilter对linux 网桥上的ipv4/ipv6包过滤，=1后，网桥转发包时也会被iptables的forward所过滤</span></span><br><span class="line">cat &lt;&lt;EOF | sudo tee /etc/sysctl.d/k8s.conf</span><br><span class="line">net.bridge.bridge-nf-call-ip6tables = <span class="number">1</span></span><br><span class="line">net.bridge.bridge-nf-call-iptables = <span class="number">1</span></span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line"><span class="comment">//从所有系统配置文件加载设置</span></span><br><span class="line">sudo sysctl --system</span><br><span class="line"></span><br><span class="line"><span class="comment">//配置k8s repo</span></span><br><span class="line">cat &lt;&lt;EOF | sudo tee /etc/yum.repos.d/kubernetes.repo</span><br><span class="line">[kubernetes]</span><br><span class="line">name=Kubernetes</span><br><span class="line">baseurl=https:<span class="comment">//packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch</span></span><br><span class="line">enabled=<span class="number">1</span></span><br><span class="line">gpgcheck=<span class="number">1</span></span><br><span class="line">repo_gpgcheck=<span class="number">1</span></span><br><span class="line">gpgkey=https:<span class="comment">//packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg</span></span><br><span class="line">exclude=kubelet kubeadm kubectl</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line"><span class="comment">// Set SELinux in permissive mode (effectively disabling it)</span></span><br><span class="line">sudo setenforce <span class="number">0</span></span><br><span class="line">sudo sed -i <span class="string">&#x27;s/^SELINUX=enforcing$/SELINUX=permissive/&#x27;</span> /etc/selinux/config</span><br><span class="line"></span><br><span class="line"><span class="comment">//安装kubectl kubectl和kubeadm,kubeadm不负责安装和管理kubrctl和kubelet</span></span><br><span class="line">sudo yum install -y kubectl-<span class="number">1.18</span><span class="number">.8</span>-<span class="number">0</span> kubelet-<span class="number">1.18</span><span class="number">.8</span>-<span class="number">0</span> kubeadm-<span class="number">1.18</span><span class="number">.8</span>-<span class="number">0</span>  --disableexcludes=kubernetes</span><br><span class="line"></span><br><span class="line"><span class="comment">//激活kubelet，开机自动启动</span></span><br><span class="line">sudo systemctl enable --now kubelet</span><br><span class="line"></span><br><span class="line">yum -y install yum-utils</span><br><span class="line"></span><br><span class="line">yum-config-manager     --add-repo     https:<span class="comment">//download.docker.com/linux/centos/docker-ce.repo</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//安装docker和contained</span></span><br><span class="line">yum install -y  containerd.io-<span class="number">1.2</span><span class="number">.13</span> docker-ce-<span class="number">19.03</span><span class="number">.11</span>  docker-ce-cli-<span class="number">19.03</span><span class="number">.11</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//开机自动启动docker</span></span><br><span class="line">systemctl enable docker</span><br><span class="line"></span><br><span class="line"><span class="comment">//配置containerd</span></span><br><span class="line">mkdir -p /etc/containerd &amp;&amp; containerd config <span class="keyword">default</span> &gt; <span class="regexp">/etc/</span>containerd/config.toml</span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li>准备kubeadm-config.yaml  <figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">kubeadm.k8s.io/v1beta2</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ClusterConfiguration</span></span><br><span class="line"><span class="attr">kubernetesVersion:</span> <span class="string">v1.18.8</span></span><br><span class="line"><span class="attr">controlPlaneEndpoint:</span> <span class="string">&quot;your-node-ip:6443&quot;</span><span class="string">（这边要记得改成master</span> <span class="string">ip）</span></span><br><span class="line"><span class="attr">networking:</span></span><br><span class="line">   <span class="attr">podSubnet:</span> <span class="string">&quot;10.244.0.0/16&quot;</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<h2 id="0x02-安装master"><a href="#0x02-安装master" class="headerlink" title="0x02 安装master"></a>0x02 安装master</h2></li>
+</ul>
+<ol>
+<li><p>sudo bash init_vm.sh</p>
+<p> <em>环境ready,软件ready</em></p>
+</li>
+<li><p>swap off and close firewall</p>
+<p> <em>关闭系统交换区和防火墙</em></p>
+</li>
+<li><p>sudo kubeadm init –config=kubeadm-config.yaml –upload-certs –pod-network-cidr=10.244.0.0/16 </p>
+<p> <em>使用kubeadm安装k8s环境，此操作成功后，k8s的master上的系统pod是ready(除了core-dns),其中–pod-network-cidr是中设置pod的网络范围，需要于kubeadm-conf里面保持一致。执行完之后需要根据输出提示将admin.conf 拷贝到$HOME/.kube/config下，使其当前用户可以使用kubectl命令</em></p>
+ <figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubeadm init --pod-network-cidr=<span class="number">10.244</span><span class="number">.0</span><span class="number">.0</span>/<span class="number">16</span></span><br><span class="line">I0618 <span class="number">09</span>:<span class="number">50</span>:<span class="number">30.846793</span> <span class="number">2033860</span> version.go:<span class="number">252</span>] remote version is much newer: v1<span class="number">.21</span><span class="number">.2</span>; falling back to: stable-<span class="number">1.18</span></span><br><span class="line">W0618 <span class="number">09</span>:<span class="number">50</span>:<span class="number">31.514380</span> <span class="number">2033860</span> configset.go:<span class="number">202</span>] WARNING: kubeadm cannot validate component configs <span class="keyword">for</span> API groups [kubelet.config.k8s.io kubeproxy.config.k8s.io]</span><br><span class="line">[init] Using Kubernetes version: v1<span class="number">.18</span><span class="number">.20</span></span><br><span class="line">[preflight] Running pre-flight checks</span><br><span class="line">		[WARNING IsDockerSystemdCheck]: detected <span class="string">&quot;cgroupfs&quot;</span> <span class="keyword">as</span> the Docker cgroup driver. The recommended driver is <span class="string">&quot;systemd&quot;</span>. Please follow the guide at https:<span class="comment">//kubernetes.io/docs/setup/cri/</span></span><br><span class="line">		[WARNING FileExisting-tc]: tc not found <span class="keyword">in</span> system path</span><br><span class="line">		[WARNING SystemVerification]: <span class="built_in">this</span> Docker version is not on the list <span class="keyword">of</span> validated versions: <span class="number">20.10</span><span class="number">.7</span>. Latest validated version: <span class="number">19.03</span></span><br><span class="line">[preflight] Pulling images required <span class="keyword">for</span> setting up a Kubernetes cluster</span><br><span class="line">[preflight] This might take a minute or two, depending on the speed <span class="keyword">of</span> your internet connection</span><br><span class="line">[preflight] You can also perform <span class="built_in">this</span> action <span class="keyword">in</span> beforehand using <span class="string">&#x27;kubeadm config images pull&#x27;</span></span><br><span class="line">[kubelet-start] Writing kubelet environment file <span class="keyword">with</span> flags to file <span class="string">&quot;/var/lib/kubelet/kubeadm-flags.env&quot;</span></span><br><span class="line">[kubelet-start] Writing kubelet configuration to file <span class="string">&quot;/var/lib/kubelet/config.yaml&quot;</span></span><br><span class="line">[kubelet-start] Starting the kubelet</span><br><span class="line">[certs] Using certificateDir folder <span class="string">&quot;/etc/kubernetes/pki&quot;</span></span><br><span class="line">[certs] Generating <span class="string">&quot;ca&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;apiserver&quot;</span> certificate and key</span><br><span class="line">[certs] apiserver serving cert is signed <span class="keyword">for</span> DNS names [localhost.localdomain kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [<span class="number">10.96</span><span class="number">.0</span><span class="number">.1</span> <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>]</span><br><span class="line">[certs] Generating <span class="string">&quot;apiserver-kubelet-client&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;front-proxy-ca&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;front-proxy-client&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;etcd/ca&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;etcd/server&quot;</span> certificate and key</span><br><span class="line">[certs] etcd/server serving cert is signed <span class="keyword">for</span> DNS names [localhost.localdomain localhost] and IPs [<span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span> ::<span class="number">1</span>]</span><br><span class="line">[certs] Generating <span class="string">&quot;etcd/peer&quot;</span> certificate and key</span><br><span class="line">[certs] etcd/peer serving cert is signed <span class="keyword">for</span> DNS names [localhost.localdomain localhost] and IPs [<span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span> ::<span class="number">1</span>]</span><br><span class="line">[certs] Generating <span class="string">&quot;etcd/healthcheck-client&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;apiserver-etcd-client&quot;</span> certificate and key</span><br><span class="line">[certs] Generating <span class="string">&quot;sa&quot;</span> key and public key</span><br><span class="line">[kubeconfig] Using kubeconfig folder <span class="string">&quot;/etc/kubernetes&quot;</span></span><br><span class="line">[kubeconfig] Writing <span class="string">&quot;admin.conf&quot;</span> kubeconfig file</span><br><span class="line">[kubeconfig] Writing <span class="string">&quot;kubelet.conf&quot;</span> kubeconfig file</span><br><span class="line">[kubeconfig] Writing <span class="string">&quot;controller-manager.conf&quot;</span> kubeconfig file</span><br><span class="line">[kubeconfig] Writing <span class="string">&quot;scheduler.conf&quot;</span> kubeconfig file</span><br><span class="line">[control-plane] Using manifest folder <span class="string">&quot;/etc/kubernetes/manifests&quot;</span></span><br><span class="line">[control-plane] Creating <span class="keyword">static</span> Pod manifest <span class="keyword">for</span> <span class="string">&quot;kube-apiserver&quot;</span></span><br><span class="line">[control-plane] Creating <span class="keyword">static</span> Pod manifest <span class="keyword">for</span> <span class="string">&quot;kube-controller-manager&quot;</span></span><br><span class="line">W0618 <span class="number">09</span>:<span class="number">50</span>:<span class="number">38.716596</span> <span class="number">2033860</span> manifests.go:<span class="number">225</span>] the <span class="keyword">default</span> kube-apiserver authorization-mode is <span class="string">&quot;Node,RBAC&quot;</span>; using <span class="string">&quot;Node,RBAC&quot;</span></span><br><span class="line">[control-plane] Creating <span class="keyword">static</span> Pod manifest <span class="keyword">for</span> <span class="string">&quot;kube-scheduler&quot;</span></span><br><span class="line">W0618 <span class="number">09</span>:<span class="number">50</span>:<span class="number">38.719390</span> <span class="number">2033860</span> manifests.go:<span class="number">225</span>] the <span class="keyword">default</span> kube-apiserver authorization-mode is <span class="string">&quot;Node,RBAC&quot;</span>; using <span class="string">&quot;Node,RBAC&quot;</span></span><br><span class="line">[etcd] Creating <span class="keyword">static</span> Pod manifest <span class="keyword">for</span> local etcd <span class="keyword">in</span> <span class="string">&quot;/etc/kubernetes/manifests&quot;</span></span><br><span class="line">[wait-control-plane] Waiting <span class="keyword">for</span> the kubelet to boot up the control plane <span class="keyword">as</span> <span class="keyword">static</span> Pods <span class="keyword">from</span> directory <span class="string">&quot;/etc/kubernetes/manifests&quot;</span>. This can take up to 4m0s</span><br><span class="line">[apiclient] All control plane components are healthy after <span class="number">20.003587</span> seconds</span><br><span class="line">[upload-config] Storing the configuration used <span class="keyword">in</span> ConfigMap <span class="string">&quot;kubeadm-config&quot;</span> <span class="keyword">in</span> the <span class="string">&quot;kube-system&quot;</span> Namespace</span><br><span class="line">[kubelet] Creating a ConfigMap <span class="string">&quot;kubelet-config-1.18&quot;</span> <span class="keyword">in</span> namespace kube-system <span class="keyword">with</span> the configuration <span class="keyword">for</span> the kubelets <span class="keyword">in</span> the cluster</span><br><span class="line">[upload-certs] Skipping phase. Please see --upload-certs</span><br><span class="line">[mark-control-plane] Marking the node localhost.localdomain <span class="keyword">as</span> control-plane by adding the label <span class="string">&quot;node-role.kubernetes.io/master=&#x27;&#x27;&quot;</span></span><br><span class="line">[mark-control-plane] Marking the node localhost.localdomain <span class="keyword">as</span> control-plane by adding the taints [node-role.kubernetes.io/master:NoSchedule]</span><br><span class="line">[bootstrap-token] Using token: becfq7.y7xx2y8mlixi1aik</span><br><span class="line">[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles</span><br><span class="line">[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to get nodes</span><br><span class="line">[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to post CSRs <span class="keyword">in</span> order <span class="keyword">for</span> nodes to get long term certificate credentials</span><br><span class="line">[bootstrap-token] configured RBAC rules to allow the csrapprover controller automatically approve CSRs <span class="keyword">from</span> a Node Bootstrap Token</span><br><span class="line">[bootstrap-token] configured RBAC rules to allow certificate rotation <span class="keyword">for</span> all node client certificates <span class="keyword">in</span> the cluster</span><br><span class="line">[bootstrap-token] Creating the <span class="string">&quot;cluster-info&quot;</span> ConfigMap <span class="keyword">in</span> the <span class="string">&quot;kube-public&quot;</span> namespace</span><br><span class="line">[kubelet-finalize] Updating <span class="string">&quot;/etc/kubernetes/kubelet.conf&quot;</span> to point to a rotatable kubelet client certificate and key</span><br><span class="line">[addons] Applied essential addon: CoreDNS</span><br><span class="line">[addons] Applied essential addon: kube-proxy</span><br><span class="line"></span><br><span class="line">Your Kubernetes control-plane has initialized successfully!</span><br><span class="line"></span><br><span class="line">To start using your cluster, you need to run the following <span class="keyword">as</span> a regular user:</span><br><span class="line"></span><br><span class="line">mkdir -p $HOME/.kube</span><br><span class="line">sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config</span><br><span class="line">sudo chown $(id -u):$(id -g) $HOME/.kube/config</span><br><span class="line"></span><br><span class="line">You should now deploy a pod network to the cluster.</span><br><span class="line">Run <span class="string">&quot;kubectl apply -f [podnetwork].yaml&quot;</span> <span class="keyword">with</span> one <span class="keyword">of</span> the options listed at:</span><br><span class="line">https:<span class="comment">//kubernetes.io/docs/concepts/cluster-administration/addons/</span></span><br><span class="line"></span><br><span class="line">Then you can join any number <span class="keyword">of</span> worker nodes by running the following on each <span class="keyword">as</span> root:</span><br><span class="line"></span><br><span class="line">kubeadm join <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>:<span class="number">6443</span> --token becfq7.y7xx2y8mlixi1aik \</span><br><span class="line">	--discovery-token-ca-cert-hash sha256:4278e3c6bf6019abe9280c7e7da1c5fe0f3b7d2c05caa282d81f1bafa0809129</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide --all-namespaces</span><br><span class="line">The connection to the server localhost:<span class="number">8080</span> was refused - did you specify the right host or port?</span><br><span class="line">[root@localhost k8s-etp-practice]# mkdir -p $HOME/.kube</span><br><span class="line">[root@localhost k8s-etp-practice]# sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config</span><br><span class="line">[root@localhost k8s-etp-practice]# sudo chown $(id -u):$(id -g) $HOME/.kube/config</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide --all-namespaces</span><br><span class="line">NAMESPACE     NAME                                            READY   STATUS              RESTARTS   AGE    IP               NODE                    NOMINATED NODE   READINESS GATES</span><br><span class="line">kube-system   coredns-66bff467f8-56qtx                        <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          112s   &lt;none&gt;           localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   coredns-66bff467f8-ln989                        <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          112s   &lt;none&gt;           localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   etcd-localhost.localdomain                      <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          2m6s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-apiserver-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          2m6s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-controller-manager-localhost.localdomain   <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          2m6s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-proxy-p8rwq                                <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          112s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-scheduler-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          2m6s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li><p>安装网络插件-flannel</p>
+ <figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">wget  https:<span class="comment">//raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml</span></span><br><span class="line">kubectl apply -f kube-flannel.yml</span><br></pre></td></tr></table></figure>
+<p> <em>此操作成功后，k8s的master的组件应该ready</em></p>
+ <figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl apply -f kube-flannel.yml</span><br><span class="line">podsecuritypolicy.policy/psp.flannel.unprivileged created</span><br><span class="line">clusterrole.rbac.authorization.k8s.io/flannel created</span><br><span class="line">clusterrolebinding.rbac.authorization.k8s.io/flannel created</span><br><span class="line">serviceaccount/flannel created</span><br><span class="line">configmap/kube-flannel-cfg created</span><br><span class="line">daemonset.apps/kube-flannel-ds created</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide --all-namespaces</span><br><span class="line">NAMESPACE     NAME                                            READY   STATUS    RESTARTS   AGE     IP               NODE                    NOMINATED NODE   READINESS GATES</span><br><span class="line">kube-system   coredns-66bff467f8-56qtx                        <span class="number">0</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m3s    <span class="number">10.244</span><span class="number">.0</span><span class="number">.2</span>       localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   coredns-66bff467f8-ln989                        <span class="number">0</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m3s    <span class="number">10.244</span><span class="number">.0</span><span class="number">.3</span>       localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   etcd-localhost.localdomain                      <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m17s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-apiserver-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m17s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-controller-manager-localhost.localdomain   <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m17s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-flannel-ds-gkgx4                           <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          7s      <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-proxy-p8rwq                                <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m3s    <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-system   kube-scheduler-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          8m17s   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<h2 id="0x03-安装node"><a href="#0x03-安装node" class="headerlink" title="0x03 安装node"></a>0x03 安装node</h2></li>
+<li><p>clone master机器</p>
+</li>
+<li><p>清理k8s环境，kubeadm reset后手动删除rm -rf $HOME/.kube/config</p>
+</li>
+<li><p>kubeadm join xxxxx(根据master kubeadm init的输出)</p>
+</li>
+</ol>
+<h2 id="0x03-测试k8s-cluster"><a href="#0x03-测试k8s-cluster" class="headerlink" title="0x03 测试k8s cluster"></a>0x03 测试k8s cluster</h2><ol>
+<li><p>查看node,并ready</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl get node</span><br><span class="line">NAME                    STATUS   ROLES    AGE   VERSION</span><br><span class="line">k8snode                 Ready    &lt;none&gt;   20h   v1<span class="number">.18</span><span class="number">.8</span></span><br><span class="line">localhost.localdomain   Ready    master   20h   v1<span class="number">.18</span><span class="number">.8</span></span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li><p>kubectl get pod -o wide –all-namespaces 查看pod是否ready</p>
+</li>
+<li><p>kubectl apply -f nginx.yaml 测试pod部署并ready</p>
+</li>
+<li><p>简单测试delete拉起和scale</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl <span class="keyword">delete</span> pod nginx-deployment-6b474476c4-6wpwr</span><br><span class="line">pod <span class="string">&quot;nginx-deployment-6b474476c4-6wpwr&quot;</span> deleted</span><br><span class="line">^C</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod</span><br><span class="line">NAME                                READY   STATUS              RESTARTS   AGE</span><br><span class="line">nginx-deployment-6b474476c4-6wpwr   <span class="number">0</span>/<span class="number">1</span>     Terminating         <span class="number">0</span>          20h</span><br><span class="line">nginx-deployment-6b474476c4-8x8z4   <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          2s</span><br><span class="line">nginx-deployment-6b474476c4-hbhxn   <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          20h</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod</span><br><span class="line">NAME                                READY   STATUS        RESTARTS   AGE</span><br><span class="line">nginx-deployment-6b474476c4-6wpwr   <span class="number">0</span>/<span class="number">1</span>     Terminating   <span class="number">0</span>          20h</span><br><span class="line">nginx-deployment-6b474476c4-8x8z4   <span class="number">1</span>/<span class="number">1</span>     Running       <span class="number">0</span>          6s</span><br><span class="line">nginx-deployment-6b474476c4-hbhxn   <span class="number">1</span>/<span class="number">1</span>     Running       <span class="number">0</span>          20h</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl scale --replicas=<span class="number">3</span> ./example/nginx.yaml</span><br><span class="line"><span class="attr">error</span>: <span class="built_in">arguments</span> <span class="keyword">in</span> resource/name form may not have more than one slash</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl scale --replicas=<span class="number">3</span> -f ./example/nginx.yaml</span><br><span class="line">deployment.apps/nginx-deployment scaled</span><br><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod</span><br><span class="line">NAME                                READY   STATUS    RESTARTS   AGE</span><br><span class="line">nginx-deployment-6b474476c4-8x8z4   <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          2m25s</span><br><span class="line">nginx-deployment-6b474476c4-hbhxn   <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          20h</span><br><span class="line">nginx-deployment-6b474476c4-l6tlm   <span class="number">1</span>/<span class="number">1</span>     Running   <span class="number">0</span>          4s</span><br><span class="line">[root@localhost k8s-etp-practice]#</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<h2 id="0x04-踩的坑和solution"><a href="#0x04-踩的坑和solution" class="headerlink" title="0x04 踩的坑和solution"></a>0x04 踩的坑和solution</h2></li>
+<li><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide --all-namespaces</span><br><span class="line">The connection to the server localhost:<span class="number">8080</span> was refused - did you specify the right host or port?</span><br><span class="line"></span><br></pre></td></tr></table></figure></li>
+<li><p>kube-flannel-ds crash,意思是flannel插件安装失败，故core-dns也没起来</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]# kubectl get pod -o wide -n kube-system</span><br><span class="line">NAME                                            READY   STATUS              RESTARTS   AGE   IP               NODE                    NOMINATED NODE   READINESS GATES</span><br><span class="line">coredns-66bff467f8-bltww                        <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          24h   &lt;none&gt;           localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">coredns-66bff467f8-vfjrd                        <span class="number">0</span>/<span class="number">1</span>     ContainerCreating   <span class="number">0</span>          24h   &lt;none&gt;           localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">etcd-localhost.localdomain                      <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          24h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-apiserver-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          24h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-controller-manager-localhost.localdomain   <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">3</span>          23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-flannel-ds-48zvh                           <span class="number">0</span>/<span class="number">1</span>     CrashLoopBackOff    <span class="number">276</span>        23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-flannel-ds-amd64-lkc4h                     <span class="number">0</span>/<span class="number">1</span>     CrashLoopBackOff    <span class="number">276</span>        23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.130</span>   k8snode                 &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-flannel-ds-amd64-wvp7q                     <span class="number">0</span>/<span class="number">1</span>     CrashLoopBackOff    <span class="number">276</span>        23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-flannel-ds-nv42w                           <span class="number">0</span>/<span class="number">1</span>     CrashLoopBackOff    <span class="number">277</span>        23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.130</span>   k8snode                 &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-proxy-g2f8d                                <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          24h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-proxy-nlv4n                                <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">0</span>          24h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.130</span>   k8snode                 &lt;none&gt;           &lt;none&gt;</span><br><span class="line">kube-scheduler-localhost.localdomain            <span class="number">1</span>/<span class="number">1</span>     Running             <span class="number">2</span>          23h   <span class="number">192.168</span><span class="number">.30</span><span class="number">.129</span>   localhost.localdomain   &lt;none&gt;           &lt;none&gt;</span><br></pre></td></tr></table></figure>
+<p>可能是与我之前kubeadm没有指定–pod-network-cidr有关，删除flannel，重新create。在master和node分别执行。</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># ip link delete cni0</span></span><br><span class="line">Cannot find device <span class="string">&quot;cni0&quot;</span></span><br><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># ip link delete flannel.1</span></span><br><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># rm -rf /var/lib/cni/</span></span><br><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># rm -f /etc/cni/net.d/*</span></span><br><span class="line">[root@localhost k8s-etp-practice]<span class="comment"># systemctl restart kubelet</span></span><br></pre></td></tr></table></figure>
+<p>然后清理使用kubedm reset清理环境，使用kubeadm init带–pod-network-cidr初始化后，再create flannel。</p>
+</li>
+<li><p>修改hostname和/etc/hosts 使其两台机器的dns解析没问题</p>
+</li>
+<li><p>在node节点运行kubectl出错：<br>[root@localhost k8s-etp-practice]# kubectl get nodes<br>The connection to the server localhost:8080 was refused - did you specify the right host or port?<br>solution:</p>
+<p> <code>出现这个问题的原因是kubectl命令需要使用kubernetes-admin来运行，解决方法如下，将主节点中的[/etc/kubernetes/admin.conf]文件拷贝到从节点相同目录下，然后配置环境变量：  echo &quot;export KUBECONFIG=/etc/kubernetes/admin.conf&quot; &gt;&gt; ~/.bash_profile  立即生效  source ~/.bash_profile  接着再运行kubectl命令就OK了</code></p>
+</li>
+</ol>
+<h2 id="0x05-总结"><a href="#0x05-总结" class="headerlink" title="0x05 总结"></a>0x05 总结</h2><ol>
+<li><p>master和node的pod和服务</p>
+<table>
+<thead>
+<tr>
+<th>pod</th>
+<th>daemon</th>
+<th>mater</th>
+<th>node</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>apiserver</td>
+<td></td>
+<td>yes</td>
+<td>no</td>
+<td>提供了资源操作的唯一入口，并提供认证、授权、访问控制、API注册和发现等机制</td>
+</tr>
+<tr>
+<td>controller manager</td>
+<td></td>
+<td>yes</td>
+<td>no</td>
+<td>负责维护集群的状态，比如故障检测、自动扩展、滚动更新等</td>
+</tr>
+<tr>
+<td>scheduler</td>
+<td></td>
+<td>yes</td>
+<td>no</td>
+<td>负责资源的调度，按照预定的调度策略将Pod调度到相应的机器上</td>
+</tr>
+<tr>
+<td>kube-proxy</td>
+<td></td>
+<td>yes</td>
+<td>yes</td>
+<td>负责为Service提供cluster内部的服务发现和负载均衡</td>
+</tr>
+<tr>
+<td>add-on(kube-dns/Ingress Controller)</td>
+<td></td>
+<td>yes</td>
+<td>no</td>
+<td>负责为整个集群提供DNS服务/为服务提供外网入口</td>
+</tr>
+<tr>
+<td></td>
+<td>Container runtime</td>
+<td>yes</td>
+<td>yes</td>
+<td>负责镜像管理以及Pod和容器的真正运行（CRI）(docker/containerd)</td>
+</tr>
+<tr>
+<td></td>
+<td>kubelet</td>
+<td>yes</td>
+<td>yes</td>
+<td>负责维护容器的生命周期，同时也负责Volume（CVI）和网络（CNI）的管理</td>
+</tr>
+<tr>
+<td></td>
+<td>etcd</td>
+<td>yes</td>
+<td>no</td>
+<td>保存了整个集群的状态</td>
+</tr>
+</tbody></table>
+</li>
+<li><p>分步确认k8s环境reday并排查问题</p>
+<ul>
+<li>kubeadm init后：kube-scheduler、kube-proxy、kube-apiserver、kube-controller-manager这些pod应该是ready的。</li>
+<li>安装网络插件（flannel）后，coredns、kube-flannel也是ready的。</li>
+</ul>
+</li>
+</ol>
+<h2 id="references"><a href="#references" class="headerlink" title="references"></a>references</h2><p> <a target="_blank" rel="noopener" href="https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/">https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/</a><br><a target="_blank" rel="noopener" href="http://docs.kubernetes.org.cn/251.html">http://docs.kubernetes.org.cn/251.html</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/k8s/" rel="tag"># k8s</a>
+          
+            <a href="/tags/kubeadm/" rel="tag"># kubeadm</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/%E9%95%BF%E6%B2%99%E6%94%BB%E7%95%A5/" rel="next" title="长沙行攻略">
+                <i class="fa fa-chevron-left"></i> 长沙行攻略
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+    </div>
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image"
+                src="https://z3.ax1x.com/2021/05/19/g4JX1f.jpg"
+                alt="" />
+            
+              <p class="site-author-name" itemprop="name"></p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">11</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">5</span>
+                  <span class="site-state-item-name">categories</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">19</span>
+                  <span class="site-state-item-name">tags</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+            <div class="links-of-author motion-element">
+                
+                  <span class="links-of-author-item">
+                    <a href="https://github.com/winterAndvelvet" target="_blank" title="GitHub">
+                      
+                        <i class="fa fa-fw fa-github"></i>GitHub</a>
+                  </span>
+                
+                  <span class="links-of-author-item">
+                    <a href="https://www.weibo.com/win9ter" target="_blank" title="Weibo">
+                      
+                        <i class="fa fa-fw fa-weibo"></i>Weibo</a>
+                  </span>
+                
+            </div>
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#0x00-what-is-kubeadm"><span class="nav-number">1.</span> <span class="nav-text">0x00 what is kubeadm?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#0x01-%E7%8E%AF%E5%A2%83%E5%87%86%E5%A4%87"><span class="nav-number">2.</span> <span class="nav-text">0x01 环境准备</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#0x02-%E5%AE%89%E8%A3%85master"><span class="nav-number">3.</span> <span class="nav-text">0x02 安装master</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#0x03-%E5%AE%89%E8%A3%85node"><span class="nav-number">4.</span> <span class="nav-text">0x03 安装node</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#0x03-%E6%B5%8B%E8%AF%95k8s-cluster"><span class="nav-number">5.</span> <span class="nav-text">0x03 测试k8s cluster</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#0x04-%E8%B8%A9%E7%9A%84%E5%9D%91%E5%92%8Csolution"><span class="nav-number">6.</span> <span class="nav-text">0x04 踩的坑和solution</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#0x05-%E6%80%BB%E7%BB%93"><span class="nav-number">7.</span> <span class="nav-text">0x05 总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#references"><span class="nav-number">8.</span> <span class="nav-text">references</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">winter</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Gemini</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/canvas-nest/canvas-nest.min.js"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+  
+  <script type="text/javascript">
+    var GUEST = ['nick','mail','link'];
+    var guest = 'nick,mail,link';
+    guest = guest.split(',').filter(item=>{
+      return GUEST.indexOf(item)>-1;
+    });
+    new Valine({
+        el: '#comments' ,
+        verify: false,
+        notify: false,
+        appId: 'DFGbK4hlIxDNNEfitbLxxb4b-gzGzoHsz',
+        appKey: 'OlNacvLRIB9Yzsekehr4OoJa',
+        placeholder: 'Just leave your comments',
+        avatar:'robohash',
+        guest_info:guest,
+        pageSize:'10' || 10,
+    });
+  </script>
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+<script>
+(function(){
+    var bp = document.createElement('script');
+    var curProtocol = window.location.protocol.split(':')[0];
+    if (curProtocol === 'https') {
+        bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';        
+    }
+    else {
+        bp.src = 'http://push.zhanzhang.baidu.com/push.js';
+    }
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(bp, s);
+})();
+</script>
+
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
